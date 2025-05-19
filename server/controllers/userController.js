@@ -1,46 +1,62 @@
 
 const {
   getUsers,
-  getUserById: findUserById,
+  getUserById,
   addUser,
   updateUserLocationById,
   getUsersByRoleType
 } = require('../models/userModel');
 
-const getAllUsers = (req, res) => {
-  const users = getUsers();
-  // Remove password from response
-  const safeUsers = users.map(({ password, ...user }) => user);
-  res.json(safeUsers);
-};
-
-const getUserById = (req, res) => {
-  const { id } = req.params;
-  const user = findUserById(id);
-  
-  if (!user) {
-    return res.status(404).json({ error: 'User not found' });
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await getUsers();
+    // Remove password from response
+    const safeUsers = users.map(({ password, ...user }) => user);
+    res.json(safeUsers);
+  } catch (error) {
+    console.error('Error getting users:', error);
+    res.status(500).json({ error: 'Server error' });
   }
-  
-  // Remove password from response
-  const { password, ...safeUser } = user;
-  res.json(safeUser);
 };
 
-const getUsersByRole = (req, res) => {
+const getUserById = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const user = await getUserById(id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Remove password from response
+    const { password, ...safeUser } = user;
+    res.json(safeUser);
+  } catch (error) {
+    console.error('Error getting user by ID:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const getUsersByRole = async (req, res) => {
   const { role } = req.params;
   
   if (!['admin', 'driver', 'employee'].includes(role)) {
     return res.status(400).json({ error: 'Invalid role' });
   }
   
-  const users = getUsersByRoleType(role);
-  // Remove password from response
-  const safeUsers = users.map(({ password, ...user }) => user);
-  res.json(safeUsers);
+  try {
+    const users = await getUsersByRoleType(role);
+    // Remove password from response
+    const safeUsers = users.map(({ password, ...user }) => user);
+    res.json(safeUsers);
+  } catch (error) {
+    console.error('Error getting users by role:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 
-const createUser = (req, res) => {
+const createUser = async (req, res) => {
   const { name, email, password, role, phone } = req.body;
   
   if (!name || !email || !password || !role) {
@@ -52,16 +68,22 @@ const createUser = (req, res) => {
   }
   
   try {
-    const newUser = addUser({ name, email, password, role, phone });
+    const newUser = await addUser({ name, email, password, role, phone });
     // Remove password from response
     const { password: pwd, ...safeUser } = newUser;
     res.status(201).json(safeUser);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    console.error('Error creating user:', error);
+    
+    if (error.message === 'Email already in use') {
+      return res.status(400).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
-const updateUserLocation = (req, res) => {
+const updateUserLocation = async (req, res) => {
   const { id } = req.params;
   const { latitude, longitude } = req.body;
   
@@ -70,12 +92,18 @@ const updateUserLocation = (req, res) => {
   }
   
   try {
-    const updatedUser = updateUserLocationById(id, { latitude, longitude });
+    const updatedUser = await updateUserLocationById(id, { latitude, longitude });
     // Remove password from response
     const { password, ...safeUser } = updatedUser;
     res.json(safeUser);
   } catch (error) {
-    res.status(404).json({ error: error.message });
+    console.error('Error updating user location:', error);
+    
+    if (error.message === 'User not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Server error' });
   }
 };
 

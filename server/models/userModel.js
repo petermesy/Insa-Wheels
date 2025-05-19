@@ -1,84 +1,56 @@
 
-// In-memory database for users
-let users = [
-  {
-    id: 'admin1',
-    name: 'Admin User',
-    email: 'admin@insa.com',
-    password: 'password',
-    role: 'admin',
-    phone: '123-456-7890'
-  },
-  {
-    id: 'driver1',
-    name: 'John Driver',
-    email: 'driver@insa.com',
-    password: 'password',
-    role: 'driver',
-    phone: '123-456-7891',
-    location: {
-      latitude: 9.0105,
-      longitude: 38.7652
-    }
-  },
-  {
-    id: 'employee1',
-    name: 'Employee One',
-    email: 'employee@insa.com',
-    password: 'password',
-    role: 'employee',
-    phone: '123-456-7892',
-    location: {
-      latitude: 9.0155,
-      longitude: 38.7632
-    }
-  }
-];
+const db = require('../config/db');
 
-const getUsers = () => {
-  return [...users];
+const getUsers = async () => {
+  const result = await db.query('SELECT * FROM users ORDER BY name');
+  return result.rows;
 };
 
-const getUserById = (id) => {
-  return users.find(user => user.id === id);
+const getUserById = async (id) => {
+  const result = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+  return result.rows[0];
 };
 
-const findUserByEmail = (email) => {
-  return users.find(user => user.email === email);
+const findUserByEmail = async (email) => {
+  const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+  return result.rows[0];
 };
 
-const getUsersByRoleType = (role) => {
-  return users.filter(user => user.role === role);
+const getUsersByRoleType = async (role) => {
+  const result = await db.query('SELECT * FROM users WHERE role = $1', [role]);
+  return result.rows;
 };
 
-const addUser = (userData) => {
+const addUser = async (userData) => {
+  const { name, email, password, role, phone } = userData;
+  
   // Check if email already exists
-  if (findUserByEmail(userData.email)) {
+  const existingUser = await findUserByEmail(email);
+  if (existingUser) {
     throw new Error('Email already in use');
   }
   
-  const newUser = {
-    id: `user${users.length + 1}`,
-    ...userData
-  };
+  const result = await db.query(
+    'INSERT INTO users (name, email, password, role, phone) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+    [name, email, password, role, phone]
+  );
   
-  users.push(newUser);
-  return newUser;
+  return result.rows[0];
 };
 
-const updateUserLocationById = (id, locationData) => {
-  const userIndex = users.findIndex(user => user.id === id);
+const updateUserLocationById = async (id, locationData) => {
+  const { latitude, longitude } = locationData;
   
-  if (userIndex === -1) {
+  const result = await db.query(
+    'UPDATE users SET location_latitude = $1, location_longitude = $2 WHERE id = $3 RETURNING *',
+    [latitude, longitude, id]
+  );
+  
+  if (result.rows.length === 0) {
     throw new Error('User not found');
   }
   
-  users[userIndex] = {
-    ...users[userIndex],
-    location: locationData
-  };
-  
-  return users[userIndex];
+  return result.rows[0];
 };
 
 module.exports = {

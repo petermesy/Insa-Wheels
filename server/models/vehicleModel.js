@@ -1,83 +1,118 @@
 
-// In-memory database for vehicles
-let vehicles = [
-  {
-    id: 'v1',
-    type: 'Bus',
-    licensePlate: 'INSA-001',
-    driverId: 'driver1',
-    assignedEmployees: ['employee1'],
-    location: {
-      latitude: 9.0105,
-      longitude: 38.7652,
-      speed: 35,
-      timestamp: new Date().toISOString()
-    }
-  }
-];
+const db = require('../config/db');
 
-const getVehicles = () => {
-  return [...vehicles];
+const getVehicles = async () => {
+  const result = await db.query(`
+    SELECT v.*, 
+      ARRAY(
+        SELECT ve.employee_id 
+        FROM vehicle_employees ve 
+        WHERE ve.vehicle_id = v.id
+      ) as assigned_employees
+    FROM vehicles v
+    ORDER BY v.id
+  `);
+  return result.rows;
 };
 
-const getVehicleById = (id) => {
-  return vehicles.find(vehicle => vehicle.id === id);
+const getVehicleById = async (id) => {
+  const result = await db.query(`
+    SELECT v.*, 
+      ARRAY(
+        SELECT ve.employee_id 
+        FROM vehicle_employees ve 
+        WHERE ve.vehicle_id = v.id
+      ) as assigned_employees
+    FROM vehicles v
+    WHERE v.id = $1
+  `, [id]);
+  return result.rows[0];
 };
 
-const getVehicleByDriverId = (driverId) => {
-  return vehicles.find(vehicle => vehicle.driverId === driverId);
+const getVehicleByDriverId = async (driverId) => {
+  const result = await db.query(`
+    SELECT v.*, 
+      ARRAY(
+        SELECT ve.employee_id 
+        FROM vehicle_employees ve 
+        WHERE ve.vehicle_id = v.id
+      ) as assigned_employees
+    FROM vehicles v
+    WHERE v.driver_id = $1
+  `, [driverId]);
+  return result.rows[0];
 };
 
-const addVehicle = (vehicleData) => {
-  const newVehicle = {
-    id: `v${vehicles.length + 1}`,
-    ...vehicleData,
-    assignedEmployees: [],
-    location: {
-      latitude: 0,
-      longitude: 0,
-      speed: 0,
-      timestamp: new Date().toISOString()
-    }
+const addVehicle = async (vehicleData) => {
+  const { type, licensePlate, driverId } = vehicleData;
+  
+  const result = await db.query(
+    'INSERT INTO vehicles (type, license_plate, driver_id) VALUES ($1, $2, $3) RETURNING *',
+    [type, licensePlate, driverId]
+  );
+  
+  // Get the newly created vehicle with assigned employees (which will be empty)
+  return {
+    ...result.rows[0],
+    assigned_employees: []
   };
-  
-  vehicles.push(newVehicle);
-  return newVehicle;
 };
 
-const updateVehicleLocationById = (id, locationData) => {
-  const vehicleIndex = vehicles.findIndex(vehicle => vehicle.id === id);
+const updateVehicleLocationById = async (id, locationData) => {
+  const { latitude, longitude, speed } = locationData;
+  const timestamp = new Date();
   
-  if (vehicleIndex === -1) {
+  const result = await db.query(
+    `UPDATE vehicles 
+     SET location_latitude = $1, location_longitude = $2, location_speed = $3, location_timestamp = $4 
+     WHERE id = $5 
+     RETURNING *`,
+    [latitude, longitude, speed || 0, timestamp, id]
+  );
+  
+  if (result.rows.length === 0) {
     throw new Error('Vehicle not found');
   }
   
-  vehicles[vehicleIndex] = {
-    ...vehicles[vehicleIndex],
-    location: {
-      ...locationData,
-      timestamp: new Date().toISOString()
-    }
-  };
-  
-  return vehicles[vehicleIndex];
+  // Get the updated vehicle with assigned employees
+  return getVehicleById(id);
 };
 
-const assignEmployeeToVehicleById = (id, employeeId) => {
-  const vehicleIndex = vehicles.findIndex(vehicle => vehicle.id === id);
-  
-  if (vehicleIndex === -1) {
+const assignEmployeeToVehicleById = async (id, employeeId) => {
+  // Check if vehicle exists
+  const vehicleResult = await db.query('SELECT * FROM vehicles WHERE id = $1', [id]);
+  if (vehicleResult.rows.length === 0) {
     throw new Error('Vehicle not found');
   }
   
-  // Check if employee is already assigned
-  if (vehicles[vehicleIndex].assignedEmployees.includes(employeeId)) {
+  // Check if employee exists and is actually an employee
+  const employeeResult = await db.query(
+    'SELECT * FROM users WHERE id = $1 AND role = $2',
+    [employeeId, 'employee']
+  );
+  
+  if (employeeResult.rows.length === 0) {
+    throw new Error('Employee not found or user is not an employee');
+  }
+  
+  // Check if assignment already exists
+  const assignmentResult = await db.query(
+    'SELECT * FROM vehicle_employees WHERE vehicle_id = $1 AND employee_id = $2',
+    [id, employeeId]
+  );
+  
+  if (assignmentResult.rows.length > 0) {
     throw new Error('Employee already assigned to this vehicle');
   }
   
-  vehicles[vehicleIndex].assignedEmployees.push(employeeId);
+  // Create assignment
+  await db.query(
+    'INSERT INTO vehicle_employees (vehicle_id, employee_id) VALUES ($1, $2)',
+    [id, employeeId]
+  );
   
-  return vehicles[vehicleIndex];
+  // Get the updated vehicle with assigned employees
+  return getVehicleById(id);
 };
 
 module.exports = {

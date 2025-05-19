@@ -1,77 +1,163 @@
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import MapComponent from './MapComponent';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-
-// Mock data
-const mockAssignedEmployees = [
-  { id: 'e1', name: 'Alice Employee', department: 'IT' },
-  { id: 'e2', name: 'Bob Employee', department: 'HR' },
-];
+import MapComponent from './MapComponent';
 
 const DriverDashboard: React.FC = () => {
   const { toast } = useToast();
-  const [isSharing, setIsSharing] = useState(true);
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; speed: number } | null>(null);
-  
-  // Simulate location updates
-  useEffect(() => {
-    // Set initial location (this would be replaced with real geolocation)
-    setCurrentLocation({
-      latitude: 9.0105,
-      longitude: 38.7652,
-      speed: 35
-    });
-    
-    // Simulate location changes
-    const locationInterval = setInterval(() => {
-      // Small random movement
-      setCurrentLocation(prev => {
-        if (!prev) return prev;
-        return {
-          latitude: prev.latitude + (Math.random() - 0.5) * 0.001,
-          longitude: prev.longitude + (Math.random() - 0.5) * 0.001,
-          speed: Math.max(0, Math.min(80, prev.speed + (Math.random() - 0.5) * 5))
-        };
-      });
-    }, 3000);
-    
-    return () => {
-      clearInterval(locationInterval);
-    };
-  }, []);
-  
-  const toggleSharing = () => {
-    setIsSharing(!isSharing);
-    if (!isSharing) {
-      toast({
-        title: 'Location Sharing Enabled',
-        description: 'Your location is now being shared with assigned employees.',
-      });
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+
+  const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+  const token = localStorage.getItem('auth_token');
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+  };
+
+  // Fetch driver's assigned vehicle
+  const {
+    data: vehicleData,
+    isLoading: isLoadingVehicle,
+    error: vehicleError,
+    refetch: refetchVehicle,
+  } = useQuery({
+    queryKey: ['driverVehicle'],
+    queryFn: async () => {
+      const response = await axios.get(
+        `http://localhost:4000/api/vehicles`,
+        { headers }
+      );
+      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id));
+    },
+  });
+
+  // Get current location
+  const requestLocation = () => {
+    if (navigator.geolocation) {
+      setIsUpdatingLocation(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation({ latitude, longitude });
+          
+          if (vehicleData) {
+            updateVehicleLocation(vehicleData.id, latitude, longitude);
+          } else {
+            updateDriverLocation(latitude, longitude);
+            toast({
+              title: 'Location Updated',
+              description: 'Your location has been updated but no vehicle is assigned to you.',
+            });
+            setIsUpdatingLocation(false);
+          }
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          toast({
+            title: 'Location Error',
+            description: 'Could not get your current location.',
+            variant: 'destructive',
+          });
+          setIsUpdatingLocation(false);
+          
+          // Fallback to simulated position
+          simulateLocation();
+        }
+      );
     } else {
       toast({
-        title: 'Location Sharing Disabled',
-        description: 'Your location is no longer being shared with employees.',
+        title: 'Geolocation Not Supported',
+        description: 'Your browser does not support geolocation.',
         variant: 'destructive',
       });
+      // Fallback to simulated position
+      simulateLocation();
     }
   };
+
+  const simulateLocation = () => {
+    // Simulate a location around INSA area
+    setCurrentLocation({
+      latitude: 9.0105 + (Math.random() * 0.01 - 0.005),
+      longitude: 38.7652 + (Math.random() * 0.01 - 0.005),
+    });
+    
+    if (vehicleData) {
+      updateVehicleLocation(
+        vehicleData.id,
+        9.0105 + (Math.random() * 0.01 - 0.005),
+        38.7652 + (Math.random() * 0.01 - 0.005)
+      );
+    }
+  };
+
+  const updateVehicleLocation = async (vehicleId: number, latitude: number, longitude: number) => {
+    try {
+      // Calculate a random speed between 0 and 60 km/h for simulation
+      const speed = Math.floor(Math.random() * 60);
+      
+      await axios.put(
+        `http://localhost:4000/api/vehicles/${vehicleId}/location`,
+        { latitude, longitude, speed },
+        { headers }
+      );
+      
+      toast({
+        title: 'Location Updated',
+        description: 'Vehicle location has been updated successfully.',
+      });
+      
+      refetchVehicle();
+    } catch (error) {
+      console.error('Error updating vehicle location:', error);
+      toast({
+        title: 'Update Error',
+        description: 'Failed to update vehicle location.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingLocation(false);
+    }
+  };
+
+  const updateDriverLocation = async (latitude: number, longitude: number) => {
+    try {
+      await axios.put(
+        `http://localhost:4000/api/users/${userInfo.id}/location`,
+        { latitude, longitude },
+        { headers }
+      );
+    } catch (error) {
+      console.error('Error updating driver location:', error);
+    }
+  };
+
+  // Request initial location when component mounts
+  useEffect(() => {
+    requestLocation();
+    
+    // Set up interval to update location periodically (every 30 seconds)
+    const intervalId = setInterval(() => {
+      requestLocation();
+    }, 30000);
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(intervalId);
+  }, [vehicleData?.id]);
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -81,81 +167,74 @@ const DriverDashboard: React.FC = () => {
             <div>
               <CardTitle className="text-2xl">Driver Dashboard</CardTitle>
               <CardDescription>
-                Manage your location sharing and view assigned employees
+                Share your location with assigned employees
               </CardDescription>
             </div>
-            <div className="flex items-center space-x-2 mt-4 md:mt-0">
-              <Switch 
-                id="location-sharing" 
-                checked={isSharing} 
-                onCheckedChange={toggleSharing}
-              />
-              <Label htmlFor="location-sharing" className="font-medium">
-                Location Sharing
-              </Label>
+            <div className="mt-4 md:mt-0">
+              <Button
+                onClick={requestLocation}
+                disabled={isUpdatingLocation}
+              >
+                {isUpdatingLocation ? 'Updating Location...' : 'Update Location'}
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="map">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="map">Map View</TabsTrigger>
-              <TabsTrigger value="employees">Assigned Employees</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="map" className="space-y-4">
-              <div className="h-[500px] w-full">
-                <MapComponent 
-                  isDriver={true}
-                  driverId="d1"
-                  vehicles={[]}
-                  employeeLocation={currentLocation || undefined}
-                />
-              </div>
-              {currentLocation && (
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <h3 className="text-sm font-medium text-muted-foreground">Current Location</h3>
-                        <p className="font-medium">
-                          {currentLocation.latitude.toFixed(5)}, {currentLocation.longitude.toFixed(5)}
-                        </p>
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-medium text-muted-foreground">Current Speed</h3>
-                        <p className="font-medium">{currentLocation.speed.toFixed(1)} km/h</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="employees" className="space-y-4">
-              {mockAssignedEmployees.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {mockAssignedEmployees.map(employee => (
-                    <Card key={employee.id}>
-                      <CardContent className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center">
-                        <div className="space-y-1">
-                          <h3 className="font-medium">{employee.name}</h3>
-                          <p className="text-sm text-muted-foreground">{employee.department}</p>
-                        </div>
-                        <div className="mt-2 md:mt-0">
-                          <Button variant="outline" size="sm">View Location</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+          <div className="h-[500px] w-full">
+            <MapComponent 
+              isDriver={true} 
+              driverId={userInfo.id}
+              vehicles={vehicleData ? [vehicleData] : []}
+            />
+          </div>
+          
+          {isLoadingVehicle ? (
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <p>Loading vehicle information...</p>
+              </CardContent>
+            </Card>
+          ) : vehicleError ? (
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <p className="text-destructive">Error loading vehicle information</p>
+              </CardContent>
+            </Card>
+          ) : vehicleData ? (
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Vehicle Type</h3>
+                    <p className="font-medium">{vehicleData.type}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">License Plate</h3>
+                    <p className="font-medium">{vehicleData.license_plate}</p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Current Speed</h3>
+                    <p className="font-medium">
+                      {vehicleData.location_speed || 0} km/h
+                    </p>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Assigned Employees</h3>
+                    <p className="font-medium">
+                      {vehicleData.assigned_employees?.length || 0} employees
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No employees assigned to you yet.</p>
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <p className="text-amber-500">No vehicle is assigned to you yet.</p>
+              </CardContent>
+            </Card>
+          )}
         </CardContent>
       </Card>
     </div>

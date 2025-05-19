@@ -1,13 +1,20 @@
 
-import React, { useState } from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
+import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import {
   Table,
   TableBody,
@@ -16,9 +23,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -27,72 +41,162 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 
-// Mock data
-const mockDrivers = [
-  { id: 'd1', name: 'John Driver', email: 'john@insa.com', phone: '123-456-7890', vehicles: ['Toyota Hiace'] },
-  { id: 'd2', name: 'Sarah Driver', email: 'sarah@insa.com', phone: '123-456-7891', vehicles: ['Ford Transit'] },
-];
+// User form schema
+const userFormSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  role: z.enum(['admin', 'driver', 'employee']),
+  phone: z.string().optional(),
+});
 
-const mockEmployees = [
-  { id: 'e1', name: 'Alice Employee', email: 'alice@insa.com', phone: '123-456-7892', department: 'IT', assignedDriver: 'd1' },
-  { id: 'e2', name: 'Bob Employee', email: 'bob@insa.com', phone: '123-456-7893', department: 'HR', assignedDriver: 'd1' },
-  { id: 'e3', name: 'Charlie Employee', email: 'charlie@insa.com', phone: '123-456-7894', department: 'Finance', assignedDriver: 'd2' },
-];
+// Vehicle form schema
+const vehicleFormSchema = z.object({
+  type: z.string().min(2, 'Type must be at least 2 characters'),
+  licensePlate: z.string().min(2, 'License plate must be at least 2 characters'),
+  driverId: z.string().min(1, 'Driver must be selected'),
+});
 
-const mockVehicles = [
-  { id: 'v1', type: 'Toyota Hiace', licensePlate: 'ABC-123', assignedDriver: 'd1' },
-  { id: 'v2', type: 'Ford Transit', licensePlate: 'XYZ-789', assignedDriver: 'd2' },
-];
-
-interface FormData {
-  name: string;
-  email: string;
-  phone: string;
-  [key: string]: string;
-}
+type UserFormData = z.infer<typeof userFormSchema>;
+type VehicleFormData = z.infer<typeof vehicleFormSchema>;
 
 const AdminDashboard: React.FC = () => {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('drivers');
-  const [driverForm, setDriverForm] = useState<FormData>({ name: '', email: '', phone: '' });
-  const [employeeForm, setEmployeeForm] = useState<FormData>({ name: '', email: '', phone: '', department: '', assignedDriver: '' });
-  const [vehicleForm, setVehicleForm] = useState<FormData>({ type: '', licensePlate: '', assignedDriver: '' });
+  const [users, setUsers] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
 
-  const handleDriverSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: 'Driver Added',
-      description: `${driverForm.name} has been added as a driver.`,
-    });
-    setDriverForm({ name: '', email: '', phone: '' });
+  const userForm = useForm<UserFormData>({
+    resolver: zodResolver(userFormSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      password: '',
+      role: 'employee',
+      phone: '',
+    },
+  });
+
+  const vehicleForm = useForm<VehicleFormData>({
+    resolver: zodResolver(vehicleFormSchema),
+    defaultValues: {
+      type: '',
+      licensePlate: '',
+      driverId: '',
+    },
+  });
+
+  const token = localStorage.getItem('auth_token');
+  const headers = {
+    Authorization: `Bearer ${token}`,
   };
 
-  const handleEmployeeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: 'Employee Added',
-      description: `${employeeForm.name} has been added as an employee.`,
-    });
-    setEmployeeForm({ name: '', email: '', phone: '', department: '', assignedDriver: '' });
+  // Fetch users
+  const {
+    data: usersData,
+    isLoading: isLoadingUsers,
+    error: usersError,
+    refetch: refetchUsers,
+  } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const response = await axios.get('http://localhost:4000/api/users', {
+        headers,
+      });
+      return response.data;
+    },
+  });
+
+  // Fetch vehicles
+  const {
+    data: vehiclesData,
+    isLoading: isLoadingVehicles,
+    error: vehiclesError,
+    refetch: refetchVehicles,
+  } = useQuery({
+    queryKey: ['vehicles'],
+    queryFn: async () => {
+      const response = await axios.get('http://localhost:4000/api/vehicles', {
+        headers,
+      });
+      return response.data;
+    },
+  });
+
+  useEffect(() => {
+    if (usersData) {
+      setUsers(usersData);
+      // Filter drivers and employees
+      setDrivers(usersData.filter((user: any) => user.role === 'driver'));
+      setEmployees(usersData.filter((user: any) => user.role === 'employee'));
+    }
+  }, [usersData]);
+
+  useEffect(() => {
+    if (vehiclesData) {
+      setVehicles(vehiclesData);
+    }
+  }, [vehiclesData]);
+
+  const onUserSubmit = async (data: UserFormData) => {
+    try {
+      await axios.post('http://localhost:4000/api/users', data, { headers });
+      toast({
+        title: 'Success',
+        description: 'User created successfully',
+      });
+      userForm.reset();
+      refetchUsers();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to create user',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleVehicleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast({
-      title: 'Vehicle Added',
-      description: `${vehicleForm.type} with license plate ${vehicleForm.licensePlate} has been added.`,
-    });
-    setVehicleForm({ type: '', licensePlate: '', assignedDriver: '' });
+  const onVehicleSubmit = async (data: VehicleFormData) => {
+    try {
+      await axios.post('http://localhost:4000/api/vehicles', data, { headers });
+      toast({
+        title: 'Success',
+        description: 'Vehicle created successfully',
+      });
+      vehicleForm.reset();
+      refetchVehicles();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to create vehicle',
+        variant: 'destructive',
+      });
+    }
   };
 
-  const handleInputChange = (form: string, field: string, value: string) => {
-    if (form === 'driver') {
-      setDriverForm(prev => ({ ...prev, [field]: value }));
-    } else if (form === 'employee') {
-      setEmployeeForm(prev => ({ ...prev, [field]: value }));
-    } else if (form === 'vehicle') {
-      setVehicleForm(prev => ({ ...prev, [field]: value }));
+  const assignEmployee = async (vehicleId: string, employeeId: string) => {
+    try {
+      await axios.post(
+        `http://localhost:4000/api/vehicles/${vehicleId}/assign`,
+        { employeeId },
+        { headers }
+      );
+      toast({
+        title: 'Success',
+        description: 'Employee assigned successfully',
+      });
+      refetchVehicles();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.error || 'Failed to assign employee',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -100,274 +204,316 @@ const AdminDashboard: React.FC = () => {
     <div className="container mx-auto p-4 space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Admin Dashboard</CardTitle>
+          <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
           <CardDescription>
-            Manage drivers, employees, and vehicles for INSA-Wheels Tracker
+            Manage vehicles, drivers, and employees
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="drivers" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid grid-cols-3 mb-6">
-              <TabsTrigger value="drivers">Drivers</TabsTrigger>
-              <TabsTrigger value="employees">Employees</TabsTrigger>
+          <Tabs defaultValue="users">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
+              <TabsTrigger value="assign">Assign</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="drivers" className="space-y-6">
+            {/* Users Tab */}
+            <TabsContent value="users" className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>Add New Driver</CardTitle>
+                  <CardTitle>Add New User</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleDriverSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="driver-name">Name</Label>
-                        <Input 
-                          id="driver-name" 
-                          value={driverForm.name} 
-                          onChange={(e) => handleInputChange('driver', 'name', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="driver-email">Email</Label>
-                        <Input 
-                          id="driver-email" 
-                          type="email" 
-                          value={driverForm.email} 
-                          onChange={(e) => handleInputChange('driver', 'email', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="driver-phone">Phone</Label>
-                        <Input 
-                          id="driver-phone" 
-                          value={driverForm.phone} 
-                          onChange={(e) => handleInputChange('driver', 'phone', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit">Add Driver</Button>
-                  </form>
+                  <Form {...userForm}>
+                    <form onSubmit={userForm.handleSubmit(onUserSubmit)} className="space-y-4">
+                      <FormField
+                        control={userForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Name</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={userForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={userForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={userForm.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Role</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a role" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="driver">Driver</SelectItem>
+                                <SelectItem value="employee">Employee</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={userForm.control}
+                        name="phone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Phone (Optional)</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit">Add User</Button>
+                    </form>
+                  </Form>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader>
-                  <CardTitle>Manage Drivers</CardTitle>
+                  <CardTitle>User List</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Assigned Vehicles</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockDrivers.map(driver => (
-                        <TableRow key={driver.id}>
-                          <TableCell>{driver.name}</TableCell>
-                          <TableCell>{driver.email}</TableCell>
-                          <TableCell>{driver.phone}</TableCell>
-                          <TableCell>{driver.vehicles.join(', ')}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm">Edit</Button>
-                            <Button variant="destructive" size="sm" className="ml-2">Delete</Button>
-                          </TableCell>
+                  {isLoadingUsers ? (
+                    <p>Loading users...</p>
+                  ) : usersError ? (
+                    <p className="text-destructive">Error loading users</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Phone</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>{user.name}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>{user.role}</TableCell>
+                            <TableCell>{user.phone || 'N/A'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
             
-            <TabsContent value="employees" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Add New Employee</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleEmployeeSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="employee-name">Name</Label>
-                        <Input 
-                          id="employee-name" 
-                          value={employeeForm.name} 
-                          onChange={(e) => handleInputChange('employee', 'name', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="employee-email">Email</Label>
-                        <Input 
-                          id="employee-email" 
-                          type="email" 
-                          value={employeeForm.email} 
-                          onChange={(e) => handleInputChange('employee', 'email', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="employee-phone">Phone</Label>
-                        <Input 
-                          id="employee-phone" 
-                          value={employeeForm.phone} 
-                          onChange={(e) => handleInputChange('employee', 'phone', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="employee-department">Department</Label>
-                        <Input 
-                          id="employee-department" 
-                          value={employeeForm.department} 
-                          onChange={(e) => handleInputChange('employee', 'department', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="employee-driver">Assigned Driver</Label>
-                        <Select 
-                          onValueChange={(value) => handleInputChange('employee', 'assignedDriver', value)}
-                          value={employeeForm.assignedDriver}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a driver" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mockDrivers.map(driver => (
-                              <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button type="submit">Add Employee</Button>
-                  </form>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Manage Employees</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Department</TableHead>
-                        <TableHead>Assigned Driver</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockEmployees.map(employee => (
-                        <TableRow key={employee.id}>
-                          <TableCell>{employee.name}</TableCell>
-                          <TableCell>{employee.email}</TableCell>
-                          <TableCell>{employee.phone}</TableCell>
-                          <TableCell>{employee.department}</TableCell>
-                          <TableCell>{mockDrivers.find(d => d.id === employee.assignedDriver)?.name || 'None'}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm">Edit</Button>
-                            <Button variant="destructive" size="sm" className="ml-2">Delete</Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            <TabsContent value="vehicles" className="space-y-6">
+            {/* Vehicles Tab */}
+            <TabsContent value="vehicles" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Add New Vehicle</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleVehicleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="vehicle-type">Vehicle Type</Label>
-                        <Input 
-                          id="vehicle-type" 
-                          value={vehicleForm.type} 
-                          onChange={(e) => handleInputChange('vehicle', 'type', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="vehicle-plate">License Plate</Label>
-                        <Input 
-                          id="vehicle-plate" 
-                          value={vehicleForm.licensePlate} 
-                          onChange={(e) => handleInputChange('vehicle', 'licensePlate', e.target.value)} 
-                          required 
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="vehicle-driver">Assigned Driver</Label>
-                        <Select 
-                          onValueChange={(value) => handleInputChange('vehicle', 'assignedDriver', value)}
-                          value={vehicleForm.assignedDriver}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a driver" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mockDrivers.map(driver => (
-                              <SelectItem key={driver.id} value={driver.id}>{driver.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <Button type="submit">Add Vehicle</Button>
-                  </form>
+                  <Form {...vehicleForm}>
+                    <form onSubmit={vehicleForm.handleSubmit(onVehicleSubmit)} className="space-y-4">
+                      <FormField
+                        control={vehicleForm.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Type</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Bus, Van, etc." />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={vehicleForm.control}
+                        name="licensePlate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>License Plate</FormLabel>
+                            <FormControl>
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={vehicleForm.control}
+                        name="driverId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Assign Driver</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a driver" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {drivers.map((driver) => (
+                                  <SelectItem key={driver.id} value={driver.id}>
+                                    {driver.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button type="submit">Add Vehicle</Button>
+                    </form>
+                  </Form>
                 </CardContent>
               </Card>
               
               <Card>
                 <CardHeader>
-                  <CardTitle>Manage Vehicles</CardTitle>
+                  <CardTitle>Vehicle List</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Type</TableHead>
-                        <TableHead>License Plate</TableHead>
-                        <TableHead>Assigned Driver</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {mockVehicles.map(vehicle => (
-                        <TableRow key={vehicle.id}>
-                          <TableCell>{vehicle.type}</TableCell>
-                          <TableCell>{vehicle.licensePlate}</TableCell>
-                          <TableCell>{mockDrivers.find(d => d.id === vehicle.assignedDriver)?.name || 'None'}</TableCell>
-                          <TableCell>
-                            <Button variant="ghost" size="sm">Edit</Button>
-                            <Button variant="destructive" size="sm" className="ml-2">Delete</Button>
-                          </TableCell>
+                  {isLoadingVehicles ? (
+                    <p>Loading vehicles...</p>
+                  ) : vehiclesError ? (
+                    <p className="text-destructive">Error loading vehicles</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Type</TableHead>
+                          <TableHead>License Plate</TableHead>
+                          <TableHead>Driver</TableHead>
+                          <TableHead>Assigned Employees</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {vehicles.map((vehicle) => {
+                          const driver = users.find((u) => u.id === vehicle.driverId);
+                          return (
+                            <TableRow key={vehicle.id}>
+                              <TableCell>{vehicle.type}</TableCell>
+                              <TableCell>{vehicle.licensePlate}</TableCell>
+                              <TableCell>{driver?.name || 'Not assigned'}</TableCell>
+                              <TableCell>
+                                {vehicle.assignedEmployees?.length || 0} employees
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            {/* Assign Tab */}
+            <TabsContent value="assign" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Assign Employees to Vehicles</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {vehicles.map((vehicle) => {
+                    const driver = users.find((u) => u.id === vehicle.driverId);
+                    
+                    return (
+                      <Card key={vehicle.id} className="mb-4">
+                        <CardHeader>
+                          <CardTitle>{vehicle.type} - {vehicle.licensePlate}</CardTitle>
+                          <CardDescription>
+                            Driver: {driver?.name || 'Not assigned'}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="font-semibold mb-2">Assigned Employees:</h4>
+                              {vehicle.assignedEmployees?.length > 0 ? (
+                                <ul className="list-disc pl-5">
+                                  {vehicle.assignedEmployees.map((empId: string) => {
+                                    const employee = users.find((u) => u.id === empId);
+                                    return <li key={empId}>{employee?.name || 'Unknown'}</li>;
+                                  })}
+                                </ul>
+                              ) : (
+                                <p className="text-muted-foreground">No employees assigned yet</p>
+                              )}
+                            </div>
+                            
+                            <div className="border-t pt-4">
+                              <h4 className="font-semibold mb-2">Assign Employee:</h4>
+                              <div className="flex items-center gap-2">
+                                <Select
+                                  onValueChange={(value) => assignEmployee(vehicle.id, value)}
+                                >
+                                  <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Select an employee" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {employees
+                                      .filter(
+                                        (emp) => !vehicle.assignedEmployees?.includes(emp.id)
+                                      )
+                                      .map((employee) => (
+                                        <SelectItem key={employee.id} value={employee.id}>
+                                          {employee.name}
+                                        </SelectItem>
+                                      ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </CardContent>
               </Card>
             </TabsContent>

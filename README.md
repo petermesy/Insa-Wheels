@@ -1,73 +1,121 @@
-# Welcome to your Lovable project
 
-## Project info
+# INSA-Wheels Tracker
 
-**URL**: https://lovable.dev/projects/65046e09-22ea-46a3-85c6-129b37ec89cb
+A real-time tracking system for INSA transportation services that allows employees to track their assigned transportation vehicles.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- **Admin Dashboard**: Manage vehicles, drivers, and employees
+- **Driver Interface**: Share location in real-time
+- **Employee Tracking**: Track assigned vehicles and estimated arrival times
+- **Role-based Access**: Different interfaces for admins, drivers, and employees
+- **PostgreSQL Database**: Persistent data storage
 
-**Use Lovable**
+## Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/65046e09-22ea-46a3-85c6-129b37ec89cb) and start prompting.
+- Node.js (v14+ recommended)
+- PostgreSQL database
+- npm or yarn
 
-Changes made via Lovable will be committed automatically to this repo.
+## Setup Instructions
 
-**Use your preferred IDE**
+### Database Setup
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Create a PostgreSQL database named `insa_wheels_tracker`
+2. Update the `.env` file in the server directory with your PostgreSQL credentials
+3. Run the initialization script to create tables and sample data:
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+# Connect to your PostgreSQL database and run:
+psql -d insa_wheels_tracker -f server/config/init.sql
+```
 
-Follow these steps:
+### Backend Setup
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+1. Navigate to the server directory:
+```bash
+cd server
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+2. Install dependencies:
+```bash
+npm install
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+3. Start the server:
+```bash
+npm start
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+The server should start on http://localhost:4000
+
+### Frontend Setup
+
+1. From the project root, install dependencies:
+```bash
+npm install
+```
+
+2. Start the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The frontend should start on http://localhost:5173
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Default Users
 
-**Use GitHub Codespaces**
+The system comes with three default users for testing:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. **Admin**
+   - Email: admin@insa.com
+   - Password: password
 
-## What technologies are used for this project?
+2. **Driver**
+   - Email: driver@insa.com
+   - Password: password
 
-This project is built with:
+3. **Employee**
+   - Email: employee@insa.com
+   - Password: password
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## API Endpoints
 
-## How can I deploy this project?
+### Authentication
+- `POST /api/auth/login` - Authenticate user
+- `GET /api/auth/verify` - Verify JWT token
 
-Simply open [Lovable](https://lovable.dev/projects/65046e09-22ea-46a3-85c6-129b37ec89cb) and click on Share -> Publish.
+### Users
+- `GET /api/users` - Get all users
+- `GET /api/users/:id` - Get user by ID
+- `GET /api/users/role/:role` - Get users by role
+- `POST /api/users` - Create new user (admin only)
+- `PUT /api/users/:id/location` - Update user location
 
-## Can I connect a custom domain to my Lovable project?
+### Vehicles
+- `GET /api/vehicles` - Get all vehicles
+- `GET /api/vehicles/:id` - Get vehicle by ID
+- `POST /api/vehicles` - Create new vehicle (admin only)
+- `PUT /api/vehicles/:id/location` - Update vehicle location
+- `POST /api/vehicles/:id/assign` - Assign employee to vehicle
 
-Yes, you can!
+## Project Structure
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+```
+├── server/               # Backend
+│   ├── config/           # Configuration files
+│   ├── controllers/      # Route controllers
+│   ├── middleware/       # Express middleware
+│   ├── models/           # Database models
+│   └── routes/           # API routes
+│
+└── src/                  # Frontend (React)
+    ├── components/       # React components
+    ├── hooks/            # Custom hooks
+    ├── lib/              # Utility functions
+    └── pages/            # Page components
+```
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## License
+
+This project is licensed under the MIT License.

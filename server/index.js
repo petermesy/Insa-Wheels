@@ -2,9 +2,13 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const vehicleRoutes = require('./routes/vehicles');
 const userRoutes = require('./routes/users');
+
+// Initialize database
+require('./config/db');
 
 const app = express();
 const PORT = process.env.PORT || 4000;

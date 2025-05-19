@@ -7,34 +7,50 @@ const {
   assignEmployeeToVehicleById
 } = require('../models/vehicleModel');
 
-const getAllVehicles = (req, res) => {
-  const vehicles = getVehicles();
-  res.json(vehicles);
-};
-
-const getVehicleById = (req, res) => {
-  const { id } = req.params;
-  const vehicle = findVehicleById(id);
-  
-  if (!vehicle) {
-    return res.status(404).json({ error: 'Vehicle not found' });
+const getAllVehicles = async (req, res) => {
+  try {
+    const vehicles = await getVehicles();
+    res.json(vehicles);
+  } catch (error) {
+    console.error('Error getting vehicles:', error);
+    res.status(500).json({ error: 'Server error' });
   }
-  
-  res.json(vehicle);
 };
 
-const createVehicle = (req, res) => {
+const getVehicleById = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    const vehicle = await findVehicleById(id);
+    
+    if (!vehicle) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    
+    res.json(vehicle);
+  } catch (error) {
+    console.error('Error getting vehicle by ID:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const createVehicle = async (req, res) => {
   const { type, licensePlate, driverId } = req.body;
   
   if (!type || !licensePlate || !driverId) {
     return res.status(400).json({ error: 'Type, license plate, and driver ID are required' });
   }
   
-  const newVehicle = addVehicle({ type, licensePlate, driverId });
-  res.status(201).json(newVehicle);
+  try {
+    const newVehicle = await addVehicle({ type, licensePlate, driverId });
+    res.status(201).json(newVehicle);
+  } catch (error) {
+    console.error('Error creating vehicle:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 
-const updateVehicleLocation = (req, res) => {
+const updateVehicleLocation = async (req, res) => {
   const { id } = req.params;
   const { latitude, longitude, speed } = req.body;
   
@@ -43,14 +59,20 @@ const updateVehicleLocation = (req, res) => {
   }
   
   try {
-    const updatedVehicle = updateVehicleLocationById(id, { latitude, longitude, speed });
+    const updatedVehicle = await updateVehicleLocationById(id, { latitude, longitude, speed });
     res.json(updatedVehicle);
   } catch (error) {
-    res.status(404).json({ error: error.message });
+    console.error('Error updating vehicle location:', error);
+    
+    if (error.message === 'Vehicle not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
-const assignEmployeeToVehicle = (req, res) => {
+const assignEmployeeToVehicle = async (req, res) => {
   const { id } = req.params;
   const { employeeId } = req.body;
   
@@ -59,10 +81,16 @@ const assignEmployeeToVehicle = (req, res) => {
   }
   
   try {
-    const updatedVehicle = assignEmployeeToVehicleById(id, employeeId);
+    const updatedVehicle = await assignEmployeeToVehicleById(id, employeeId);
     res.json(updatedVehicle);
   } catch (error) {
-    res.status(404).json({ error: error.message });
+    console.error('Error assigning employee to vehicle:', error);
+    
+    if (error.message.includes('not found') || error.message.includes('already assigned')) {
+      return res.status(400).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Server error' });
   }
 };
 

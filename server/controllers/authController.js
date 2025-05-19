@@ -1,10 +1,11 @@
 
 const jwt = require('jsonwebtoken');
 const { findUserByEmail } = require('../models/userModel');
+require('dotenv').config();
 
-const JWT_SECRET = 'insa_wheels_tracker_secret'; // In production, this should be in environment variables
+const JWT_SECRET = process.env.JWT_SECRET || 'insa_wheels_tracker_secret';
 
-const login = (req, res) => {
+const login = async (req, res) => {
   const { email, password } = req.body;
   
   // Simple authentication (replace with proper authentication in production)
@@ -12,29 +13,34 @@ const login = (req, res) => {
     return res.status(400).json({ error: 'Email and password are required' });
   }
   
-  const user = findUserByEmail(email);
-  
-  if (!user || user.password !== password) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  
-  // Generate JWT token
-  const token = jwt.sign(
-    { userId: user.id, email: user.email, role: user.role },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
-  
-  res.json({
-    message: 'Login successful',
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role
+  try {
+    const user = await findUserByEmail(email);
+    
+    if (!user || user.password !== password) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
-  });
+    
+    // Generate JWT token
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+    
+    res.json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Server error during login' });
+  }
 };
 
 const verifyToken = (req, res) => {
