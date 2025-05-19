@@ -1,4 +1,3 @@
-
 const db = require('../config/db');
 
 const getUsers = async () => {
@@ -38,6 +37,47 @@ const addUser = async (userData) => {
   return result.rows[0];
 };
 
+const updateUserById = async (id, userData) => {
+  const { name, email, password, role, phone } = userData;
+  
+  // Check if user exists
+  const user = await getUserById(id);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
+  // Check if email already exists and belongs to a different user
+  if (email !== user.email) {
+    const existingUser = await findUserByEmail(email);
+    if (existingUser) {
+      throw new Error('Email already in use');
+    }
+  }
+  
+  // If password is not provided, keep the existing one
+  const updatedPassword = password || user.password;
+  
+  const result = await db.query(
+    'UPDATE users SET name = $1, email = $2, password = $3, role = $4, phone = $5 WHERE id = $6 RETURNING *',
+    [name, email, updatedPassword, role, phone, id]
+  );
+  
+  return result.rows[0];
+};
+
+const deleteUserById = async (id) => {
+  // Check if user exists
+  const user = await getUserById(id);
+  if (!user) {
+    throw new Error('User not found');
+  }
+  
+  // Delete the user
+  await db.query('DELETE FROM users WHERE id = $1', [id]);
+  
+  return true;
+};
+
 const updateUserLocationById = async (id, locationData) => {
   const { latitude, longitude } = locationData;
   
@@ -59,5 +99,7 @@ module.exports = {
   findUserByEmail,
   getUsersByRoleType,
   addUser,
+  updateUserById,
+  deleteUserById,
   updateUserLocationById
 };

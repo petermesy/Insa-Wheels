@@ -58,6 +58,40 @@ const addVehicle = async (vehicleData) => {
   };
 };
 
+const updateVehicleById = async (id, vehicleData) => {
+  const { type, licensePlate, driverId } = vehicleData;
+  
+  // Check if vehicle exists
+  const vehicle = await getVehicleById(id);
+  if (!vehicle) {
+    throw new Error('Vehicle not found');
+  }
+  
+  const result = await db.query(
+    'UPDATE vehicles SET type = $1, license_plate = $2, driver_id = $3 WHERE id = $4 RETURNING *',
+    [type, licensePlate, driverId, id]
+  );
+  
+  // Get the updated vehicle with assigned employees
+  return getVehicleById(id);
+};
+
+const deleteVehicleById = async (id) => {
+  // Check if vehicle exists
+  const vehicle = await getVehicleById(id);
+  if (!vehicle) {
+    throw new Error('Vehicle not found');
+  }
+  
+  // Delete associated vehicle_employees records
+  await db.query('DELETE FROM vehicle_employees WHERE vehicle_id = $1', [id]);
+  
+  // Delete the vehicle
+  await db.query('DELETE FROM vehicles WHERE id = $1', [id]);
+  
+  return true;
+};
+
 const updateVehicleLocationById = async (id, locationData) => {
   const { latitude, longitude, speed } = locationData;
   const timestamp = new Date();
@@ -120,6 +154,8 @@ module.exports = {
   getVehicleById,
   getVehicleByDriverId,
   addVehicle,
+  updateVehicleById,
+  deleteVehicleById,
   updateVehicleLocationById,
   assignEmployeeToVehicleById
 };

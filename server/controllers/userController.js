@@ -4,7 +4,9 @@ const {
   getUserById,
   addUser,
   updateUserLocationById,
-  getUsersByRoleType
+  getUsersByRoleType,
+  updateUserById,
+  deleteUserById
 } = require('../models/userModel');
 
 const getAllUsers = async (req, res) => {
@@ -83,6 +85,55 @@ const createUser = async (req, res) => {
   }
 };
 
+const updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { name, email, password, role, phone } = req.body;
+  
+  if (!name || !email || !role) {
+    return res.status(400).json({ error: 'Name, email, and role are required' });
+  }
+  
+  if (!['admin', 'driver', 'employee'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  
+  try {
+    const updatedUser = await updateUserById(id, { name, email, password, role, phone });
+    // Remove password from response
+    const { password: pwd, ...safeUser } = updatedUser;
+    res.json(safeUser);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    
+    if (error.message === 'User not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    if (error.message === 'Email already in use') {
+      return res.status(400).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
+const deleteUser = async (req, res) => {
+  const { id } = req.params;
+  
+  try {
+    await deleteUserById(id);
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    
+    if (error.message === 'User not found') {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: 'Server error' });
+  }
+};
+
 const updateUserLocation = async (req, res) => {
   const { id } = req.params;
   const { latitude, longitude } = req.body;
@@ -112,5 +163,7 @@ module.exports = {
   getUserById,
   getUsersByRole,
   createUser,
+  updateUser,
+  deleteUser,
   updateUserLocation
 };

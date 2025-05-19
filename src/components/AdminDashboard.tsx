@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import {
@@ -15,14 +15,6 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   Form,
   FormControl,
@@ -44,6 +36,8 @@ import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import AdminUsersList from './admin/AdminUsersList';
+import AdminVehiclesList from './admin/AdminVehiclesList';
 
 // User form schema
 const userFormSchema = z.object({
@@ -179,46 +173,74 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const assignEmployee = async (vehicleId: string, employeeId: string) => {
-    try {
-      await axios.post(
-        `http://localhost:4000/api/vehicles/${vehicleId}/assign`,
-        { employeeId },
-        { headers }
-      );
-      toast({
-        title: 'Success',
-        description: 'Employee assigned successfully',
-      });
-      refetchVehicles();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.response?.data?.error || 'Failed to assign employee',
-        variant: 'destructive',
-      });
-    }
-  };
-
   return (
     <div className="container mx-auto p-4 space-y-6">
-      <Card>
-        <CardHeader>
+      <Card className="bg-white shadow-md">
+        <CardHeader className="bg-gradient-to-r from-purple-100 to-indigo-50">
           <CardTitle className="text-2xl">Admin Dashboard</CardTitle>
           <CardDescription>
             Manage vehicles, drivers, and employees
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="users">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="users">Users</TabsTrigger>
+        <CardContent className="p-4">
+          <Tabs defaultValue="drivers">
+            <TabsList className="grid w-full grid-cols-5 mb-6">
+              <TabsTrigger value="drivers">Drivers</TabsTrigger>
+              <TabsTrigger value="employees">Employees</TabsTrigger>
               <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
-              <TabsTrigger value="assign">Assign</TabsTrigger>
+              <TabsTrigger value="add-user">Add User</TabsTrigger>
+              <TabsTrigger value="add-vehicle">Add Vehicle</TabsTrigger>
             </TabsList>
             
-            {/* Users Tab */}
-            <TabsContent value="users" className="space-y-4">
+            {/* Drivers Tab */}
+            <TabsContent value="drivers" className="space-y-4">
+              {isLoadingUsers ? (
+                <p className="text-center py-4">Loading drivers...</p>
+              ) : usersError ? (
+                <p className="text-center py-4 text-destructive">Error loading drivers</p>
+              ) : (
+                <AdminUsersList 
+                  users={users}
+                  refetchUsers={refetchUsers}
+                  title="Drivers"
+                  role="driver"
+                />
+              )}
+            </TabsContent>
+            
+            {/* Employees Tab */}
+            <TabsContent value="employees" className="space-y-4">
+              {isLoadingUsers ? (
+                <p className="text-center py-4">Loading employees...</p>
+              ) : usersError ? (
+                <p className="text-center py-4 text-destructive">Error loading employees</p>
+              ) : (
+                <AdminUsersList 
+                  users={users}
+                  refetchUsers={refetchUsers}
+                  title="Employees"
+                  role="employee"
+                />
+              )}
+            </TabsContent>
+            
+            {/* Vehicles Tab */}
+            <TabsContent value="vehicles" className="space-y-4">
+              {isLoadingVehicles || isLoadingUsers ? (
+                <p className="text-center py-4">Loading vehicles...</p>
+              ) : vehiclesError ? (
+                <p className="text-center py-4 text-destructive">Error loading vehicles</p>
+              ) : (
+                <AdminVehiclesList 
+                  vehicles={vehicles}
+                  drivers={users}
+                  refetchVehicles={refetchVehicles}
+                />
+              )}
+            </TabsContent>
+            
+            {/* Add User Tab */}
+            <TabsContent value="add-user" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Add New User</CardTitle>
@@ -308,44 +330,10 @@ const AdminDashboard: React.FC = () => {
                   </Form>
                 </CardContent>
               </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>User List</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingUsers ? (
-                    <p>Loading users...</p>
-                  ) : usersError ? (
-                    <p className="text-destructive">Error loading users</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Phone</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell>{user.name}</TableCell>
-                            <TableCell>{user.email}</TableCell>
-                            <TableCell>{user.role}</TableCell>
-                            <TableCell>{user.phone || 'N/A'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
             </TabsContent>
             
-            {/* Vehicles Tab */}
-            <TabsContent value="vehicles" className="space-y-4">
+            {/* Add Vehicle Tab */}
+            <TabsContent value="add-vehicle" className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Add New Vehicle</CardTitle>
@@ -409,111 +397,6 @@ const AdminDashboard: React.FC = () => {
                       <Button type="submit">Add Vehicle</Button>
                     </form>
                   </Form>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Vehicle List</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingVehicles ? (
-                    <p>Loading vehicles...</p>
-                  ) : vehiclesError ? (
-                    <p className="text-destructive">Error loading vehicles</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Type</TableHead>
-                          <TableHead>License Plate</TableHead>
-                          <TableHead>Driver</TableHead>
-                          <TableHead>Assigned Employees</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {vehicles.map((vehicle) => {
-                          const driver = users.find((u) => u.id === vehicle.driverId);
-                          return (
-                            <TableRow key={vehicle.id}>
-                              <TableCell>{vehicle.type}</TableCell>
-                              <TableCell>{vehicle.licensePlate}</TableCell>
-                              <TableCell>{driver?.name || 'Not assigned'}</TableCell>
-                              <TableCell>
-                                {vehicle.assignedEmployees?.length || 0} employees
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-            
-            {/* Assign Tab */}
-            <TabsContent value="assign" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Assign Employees to Vehicles</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {vehicles.map((vehicle) => {
-                    const driver = users.find((u) => u.id === vehicle.driverId);
-                    
-                    return (
-                      <Card key={vehicle.id} className="mb-4">
-                        <CardHeader>
-                          <CardTitle>{vehicle.type} - {vehicle.licensePlate}</CardTitle>
-                          <CardDescription>
-                            Driver: {driver?.name || 'Not assigned'}
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            <div>
-                              <h4 className="font-semibold mb-2">Assigned Employees:</h4>
-                              {vehicle.assignedEmployees?.length > 0 ? (
-                                <ul className="list-disc pl-5">
-                                  {vehicle.assignedEmployees.map((empId: string) => {
-                                    const employee = users.find((u) => u.id === empId);
-                                    return <li key={empId}>{employee?.name || 'Unknown'}</li>;
-                                  })}
-                                </ul>
-                              ) : (
-                                <p className="text-muted-foreground">No employees assigned yet</p>
-                              )}
-                            </div>
-                            
-                            <div className="border-t pt-4">
-                              <h4 className="font-semibold mb-2">Assign Employee:</h4>
-                              <div className="flex items-center gap-2">
-                                <Select
-                                  onValueChange={(value) => assignEmployee(vehicle.id, value)}
-                                >
-                                  <SelectTrigger className="w-[200px]">
-                                    <SelectValue placeholder="Select an employee" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {employees
-                                      .filter(
-                                        (emp) => !vehicle.assignedEmployees?.includes(emp.id)
-                                      )
-                                      .map((employee) => (
-                                        <SelectItem key={employee.id} value={employee.id}>
-                                          {employee.name}
-                                        </SelectItem>
-                                      ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
                 </CardContent>
               </Card>
             </TabsContent>
