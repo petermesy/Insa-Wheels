@@ -45,32 +45,50 @@ const LoginForm: React.FC = () => {
     },
   });
   
-  const onSubmit = (values: z.infer<typeof formSchema>) => {
-    console.log(values);
-    
-    // Mock authentication - this would be replaced with actual auth
-    if (values.email === 'admin@insa.com' && values.password === 'password') {
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      // Call our backend API
+      const response = await fetch('http://localhost:4000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(values),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+      
+      // Store token in localStorage
+      localStorage.setItem('auth_token', data.token);
+      localStorage.setItem('user_info', JSON.stringify(data.user));
+      
       toast({
         title: 'Login Successful',
-        description: 'Welcome back, Admin!',
+        description: `Welcome back, ${data.user.name}!`,
       });
-      navigate('/admin');
-    } else if (values.email === 'driver@insa.com' && values.password === 'password') {
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back, Driver!',
-      });
-      navigate('/driver');
-    } else if (values.email === 'employee@insa.com' && values.password === 'password') {
-      toast({
-        title: 'Login Successful',
-        description: 'Welcome back!',
-      });
-      navigate('/dashboard');
-    } else {
+      
+      // Redirect based on user role
+      switch (data.user.role) {
+        case 'admin':
+          navigate('/admin');
+          break;
+        case 'driver':
+          navigate('/driver');
+          break;
+        case 'employee':
+          navigate('/dashboard');
+          break;
+        default:
+          navigate('/');
+      }
+    } catch (error) {
       toast({
         title: 'Login Failed',
-        description: 'Invalid email or password.',
+        description: error instanceof Error ? error.message : 'Invalid email or password.',
         variant: 'destructive',
       });
     }
