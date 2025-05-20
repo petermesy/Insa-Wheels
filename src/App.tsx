@@ -10,6 +10,7 @@ import Register from "./pages/Register";
 import AdminPage from "./pages/AdminPage";
 import DriverPage from "./pages/DriverPage";
 import DashboardPage from "./pages/DashboardPage";
+import AssignmentPage from "./pages/AssignmentPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/driver" element={<DriverPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/assignments" element={<AssignmentPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
