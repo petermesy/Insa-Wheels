@@ -1,4 +1,3 @@
-
 const express = require('express');
 const router = express.Router();
 const { validateToken } = require('../middleware/auth');
@@ -7,14 +6,17 @@ const { validateToken } = require('../middleware/auth');
 router.use(validateToken);
 
 // Location update endpoint for drivers
-router.post('/update', (req, res) => {
+router.post('/car-location', async (req, res) => {
   try {
-    const { driverId, location, altitude, accuracy, speed } = req.body;
-    
+    // Get driverId from JWT token (req.user)
+    const driverId = req.user.userId || req.user.id;
+    const { location, altitude, accuracy, speed } = req.body;
+    const io = req.app.get('io');
+
     if (!driverId || !location) {
       return res.status(400).json({ error: 'Driver ID and location are required' });
     }
-    
+
     const locationData = {
       driverId,
       location,
@@ -23,10 +25,10 @@ router.post('/update', (req, res) => {
       speed,
       timestamp: new Date()
     };
-    
-    // Emit to all connected clients
-    req.io.emit('carLocationUpdate', locationData);
-    
+
+    // (You can add your logic to emit to assigned employees here)
+    io.emit('carLocationUpdate', locationData);
+
     console.log('Location update received:', locationData);
     res.status(200).json({ success: true });
   } catch (error) {

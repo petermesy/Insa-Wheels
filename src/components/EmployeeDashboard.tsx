@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import {
@@ -12,19 +11,24 @@ import {
 import MapComponent from './MapComponent';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { io } from 'socket.io-client';
+
+const socket = io('http://localhost:4000');
 
 const EmployeeDashboard: React.FC = () => {
   const { toast } = useToast();
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
-  
+  const [driverLocation, setDriverLocation] = useState<any>(null);
+  const [driverAddress, setDriverAddress] = useState<string>('Loading...');
+
   const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
   const token = localStorage.getItem('auth_token');
 
   const headers = {
     Authorization: `Bearer ${token}`,
   };
-  
+
   // Fetch vehicles where this employee is assigned
   const {
     data: vehiclesData,
@@ -35,13 +39,13 @@ const EmployeeDashboard: React.FC = () => {
     queryKey: ['employeeVehicles'],
     queryFn: async () => {
       const response = await axios.get('http://localhost:4000/api/vehicles', { headers });
-      return response.data.filter((vehicle: any) => 
-        vehicle.assigned_employees && 
+      return response.data.filter((vehicle: any) =>
+        vehicle.assigned_employees &&
         vehicle.assigned_employees.includes(parseInt(userInfo.id))
       );
     },
   });
-  
+
   // Fetch all drivers to get their names
   const {
     data: driversData,
@@ -53,10 +57,10 @@ const EmployeeDashboard: React.FC = () => {
       return response.data;
     },
   });
-  
+
   const requestLocation = () => {
     setIsLocating(true);
-    
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -72,7 +76,7 @@ const EmployeeDashboard: React.FC = () => {
             variant: 'destructive',
           });
           setIsLocating(false);
-          
+
           // Fallback to simulated location
           simulateLocation();
         }
@@ -87,16 +91,16 @@ const EmployeeDashboard: React.FC = () => {
       simulateLocation();
     }
   };
-  
+
   const simulateLocation = () => {
     // Simulate a location around INSA area
     const latitude = 9.0155 + (Math.random() * 0.01 - 0.005);
     const longitude = 38.7632 + (Math.random() * 0.01 - 0.005);
-    
+
     setCurrentLocation({ latitude, longitude });
     updateEmployeeLocation(latitude, longitude);
   };
-  
+
   const updateEmployeeLocation = async (latitude: number, longitude: number) => {
     try {
       await axios.put(
@@ -104,7 +108,7 @@ const EmployeeDashboard: React.FC = () => {
         { latitude, longitude },
         { headers }
       );
-      
+
       toast({
         title: 'Location Updated',
         description: 'Your current location has been updated.',
@@ -120,11 +124,11 @@ const EmployeeDashboard: React.FC = () => {
       setIsLocating(false);
     }
   };
-  
+
   // Enhanced vehicles data with driver names
-  const enhancedVehicles = React.useMemo(() => {
+  const enhancedVehicles = useMemo(() => {
     if (!vehiclesData || !driversData) return [];
-    
+
     return vehiclesData.map((vehicle: any) => {
       const driver = driversData.find((d: any) => d.id === vehicle.driver_id);
       return {
@@ -141,16 +145,60 @@ const EmployeeDashboard: React.FC = () => {
       };
     });
   }, [vehiclesData, driversData]);
-  
+
+  // Reverse geocode function
+  const getAddressFromLatLng = async (lat: number, lon: number) => {
+    try {
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/reverse`,
+        {
+          params: {
+            lat,
+            lon,
+            format: 'json',
+          },
+        }
+      );
+      return response.data.display_name;
+    } catch (error) {
+      return 'Unknown location';
+    }
+  };
+
+  // Real-time driver location via Socket.IO
+  useEffect(() => {
+    socket.emit('joinRoom', `employee_${userInfo.id}`);
+
+    socket.on('carLocationUpdate', async (locationData) => {
+      setDriverLocation(locationData);
+      if (
+        locationData &&
+        Array.isArray(locationData.location) &&
+        locationData.location.length === 2
+      ) {
+        const [lat, lon] = locationData.location;
+        const address = await getAddressFromLatLng(lat, lon);
+        setDriverAddress(address);
+      } else {
+        setDriverAddress('Unknown location');
+      }
+    });
+
+    return () => {
+      socket.off('carLocationUpdate');
+      socket.emit('leaveRoom', `employee_${userInfo.id}`);
+    };
+  }, [userInfo.id]);
+
   // Request initial location when component mounts
   useEffect(() => {
     requestLocation();
-    
+
     // Set up interval to update location periodically (every minute)
     const intervalId = setInterval(() => {
       requestLocation();
     }, 60000);
-    
+
     // Clean up interval on component unmount
     return () => clearInterval(intervalId);
   }, []);
@@ -167,8 +215,8 @@ const EmployeeDashboard: React.FC = () => {
               </CardDescription>
             </div>
             <div className="mt-4 md:mt-0">
-              <Button 
-                onClick={requestLocation} 
+              <Button
+                onClick={requestLocation}
                 disabled={isLocating}
               >
                 {isLocating ? 'Updating Location...' : 'Update My Location'}
@@ -178,13 +226,22 @@ const EmployeeDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="h-[500px] w-full">
-            <MapComponent 
+            <MapComponent
               vehicles={enhancedVehicles}
               employeeLocation={currentLocation || undefined}
               employeeId={userInfo.id}
+              // Pass driver's real-time location to the map
+              driverLocation={
+                driverLocation && Array.isArray(driverLocation.location)
+                  ? {
+                      latitude: driverLocation.location[0],
+                      longitude: driverLocation.location[1],
+                    }
+                  : undefined
+              }
             />
           </div>
-          
+
           {isLoadingVehicles || isLoadingDrivers ? (
             <Card className="mt-4">
               <CardContent className="p-4">
@@ -224,6 +281,39 @@ const EmployeeDashboard: React.FC = () => {
                 <p className="text-amber-500">You are not assigned to any vehicle yet.</p>
               </CardContent>
             </Card>
+          )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Assigned Driver Location (Real-Time)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {driverLocation ? (
+            <div className="bg-gray-100 p-4 rounded shadow">
+              <div>
+                <strong>Coordinates:</strong>{' '}
+                {driverLocation.location[0].toFixed(6)}, {driverLocation.location[1].toFixed(6)}
+              </div>
+              <div>
+                <strong>Location Name:</strong>{' '}
+                {driverAddress}
+              </div>
+              <div>
+                <strong>Speed:</strong>{' '}
+                {driverLocation.speed !== null && driverLocation.speed !== undefined
+                  ? `${Math.round(driverLocation.speed * 3.6)} km/h`
+                  : 'N/A'}
+              </div>
+              <div>
+                <strong>Timestamp:</strong>{' '}
+                {driverLocation.timestamp
+                  ? new Date(driverLocation.timestamp).toLocaleString()
+                  : 'N/A'}
+              </div>
+            </div>
+          ) : (
+            <div className="text-gray-500">Waiting for driver location...</div>
           )}
         </CardContent>
       </Card>

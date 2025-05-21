@@ -1,13 +1,23 @@
+import React, { useEffect, useRef, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  Popup,
+} from "react-leaflet";
+import L from "leaflet";
+import axios from "axios";
+import "leaflet/dist/leaflet.css";
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-
-// Mock types for demonstration - these would be replaced with actual API responses
 interface Location {
   latitude: number;
   longitude: number;
   speed?: number;
   timestamp?: string;
+  altitude?: number;
+  accuracy?: number;
 }
 
 interface VehicleData {
@@ -18,19 +28,28 @@ interface VehicleData {
   assignedEmployees: string[];
 }
 
-interface EmployeeLocation {
-  id: string;
-  name: string;
-  location: Location;
-}
-
 interface MapComponentProps {
   vehicles?: VehicleData[];
   employeeLocation?: Location;
   employeeId?: string;
   isDriver?: boolean;
   driverId?: string;
+  driverLocation?: { latitude: number; longitude: number }; // Real-time driver location
 }
+
+const carIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/61/61168.png",
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
+
+const userIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
+  iconSize: [32, 32],
+  iconAnchor: [16, 32],
+  popupAnchor: [0, -32],
+});
 
 const MapComponent: React.FC<MapComponentProps> = ({
   vehicles = [],
@@ -38,187 +57,148 @@ const MapComponent: React.FC<MapComponentProps> = ({
   employeeId,
   isDriver = false,
   driverId,
+  driverLocation,
 }) => {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<any>(null);
-  const [selectedVehicle, setSelectedVehicle] = useState<VehicleData | null>(null);
-  
-  // Mock data for demonstration
-  const mockVehicles: VehicleData[] = [
-    {
-      id: 'v1',
-      driverId: 'd1',
-      driverName: 'John Driver',
-      location: {
-        latitude: 9.0105,
-        longitude: 38.7652,
-        speed: 35,
-        timestamp: new Date().toISOString(),
-      },
-      assignedEmployees: ['e1', 'e2'],
-    },
-    {
-      id: 'v2',
-      driverId: 'd2',
-      driverName: 'Sarah Driver',
-      location: {
-        latitude: 9.0225,
-        longitude: 38.7622,
-        speed: 0,
-        timestamp: new Date().toISOString(),
-      },
-      assignedEmployees: ['e3'],
-    },
-  ];
-  
-  const mockEmployeeLocation: Location = {
-    latitude: 9.0155, 
-    longitude: 38.7632,
-  };
+  const [route, setRoute] = useState<[number, number][]>([]);
+  const [distance, setDistance] = useState<number>(0);
+  const [eta, setEta] = useState<number>(0);
+  const [carLocationName, setCarLocationName] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
 
-  // Calculate distance function
-  const calculateDistance = (loc1: Location, loc2: Location) => {
-    // Simple distance calculation (this is just for demonstration)
-    const R = 6371e3; // Earth radius in meters
-    const φ1 = (loc1.latitude * Math.PI) / 180;
-    const φ2 = (loc2.latitude * Math.PI) / 180;
-    const Δφ = ((loc2.latitude - loc1.latitude) * Math.PI) / 180;
-    const Δλ = ((loc2.longitude - loc1.longitude) * Math.PI) / 180;
+  // Convert to [lat, lng] array for Leaflet
+  const employeeLatLng =
+    employeeLocation && employeeLocation.latitude && employeeLocation.longitude
+      ? [employeeLocation.latitude, employeeLocation.longitude]
+      : undefined;
+  const driverLatLng =
+    driverLocation && driverLocation.latitude && driverLocation.longitude
+      ? [driverLocation.latitude, driverLocation.longitude]
+      : undefined;
 
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distance = R * c;
-    
-    return distance; // Distance in meters
-  };
-
-  // Calculate ETA function
-  const calculateETA = (distance: number, speed: number) => {
-    if (speed <= 0) return 'Vehicle stopped';
-    // Convert speed to m/s
-    const speedMps = speed * 1000 / 3600;
-    // Calculate time in seconds
-    const timeSeconds = distance / speedMps;
-    
-    if (timeSeconds < 60) {
-      return 'Less than a minute';
-    } else if (timeSeconds < 3600) {
-      return `${Math.round(timeSeconds / 60)} minutes`;
-    } else {
-      const hours = Math.floor(timeSeconds / 3600);
-      const minutes = Math.round((timeSeconds % 3600) / 60);
-      return `${hours} hour${hours > 1 ? 's' : ''} ${minutes} minute${minutes > 1 ? 's' : ''}`;
-    }
-  };
-
+  // Fetch route, distance, and ETA whenever locations change
   useEffect(() => {
-    // This is a placeholder for the map implementation
-    // In a real implementation, you would initialize a map library like Google Maps or Mapbox here
-    console.log('Map would be initialized here with container:', mapContainerRef.current);
-    
-    // Mock setting the map
-    setMap({
-      initialized: true,
-      addMarker: (location: Location, options: any) => {
-        console.log('Added marker at', location, 'with options', options);
-        return { 
-          id: Math.random().toString(),
-          setContent: (content: string) => console.log('Set marker content to', content),
-          setPosition: (pos: any) => console.log('Updated marker position to', pos)
-        };
-      },
-      setCenter: (location: Location) => {
-        console.log('Set map center to', location);
+    const fetchRoute = async () => {
+      if (!employeeLatLng || !driverLatLng) return;
+      const apiKey = "a2618160-4888-4804-be62-891f5cba83c9";
+      const url = `https://graphhopper.com/api/1/route?point=${driverLatLng[0]},${driverLatLng[1]}&point=${employeeLatLng[0]},${employeeLatLng[1]}&vehicle=car&locale=en&key=${apiKey}`;
+
+      try {
+        const response = await axios.get(url);
+        if (
+          response.data.paths &&
+          response.data.paths.length > 0 &&
+          response.data.paths[0].points &&
+          response.data.paths[0].points.coordinates
+        ) {
+          const points = response.data.paths[0].points.coordinates.map(
+            (coord: [number, number]) => [coord[1], coord[0]]
+          );
+          setRoute(points);
+          setDistance(response.data.paths[0].distance);
+          setEta(response.data.paths[0].time / 1000);
+        } else {
+          setError("No route found");
+          setRoute([]);
+          setDistance(0);
+          setEta(0);
+        }
+      } catch (error) {
+        setError("Error fetching route");
+        setRoute([]);
+        setDistance(0);
+        setEta(0);
       }
-    });
-
-    // Clean up function
-    return () => {
-      console.log('Map would be destroyed here');
-      setMap(null);
     };
-  }, []);
+    fetchRoute();
+  }, [employeeLatLng, driverLatLng]);
 
+  // Reverse geocode car location to get address
   useEffect(() => {
-    if (!map?.initialized) return;
-
-    // This would add markers for vehicles
-    const vehiclesToShow = vehicles.length > 0 ? vehicles : mockVehicles;
-    
-    vehiclesToShow.forEach(vehicle => {
-      console.log(`Added vehicle marker for ${vehicle.driverName} at ${vehicle.location.latitude}, ${vehicle.location.longitude}`);
-      // This would add a marker for each vehicle
-    });
-
-    // This would add a marker for the employee's location
-    const empLocation = employeeLocation || mockEmployeeLocation;
-    console.log(`Added employee marker at ${empLocation.latitude}, ${empLocation.longitude}`);
-
-    // Set initial selected vehicle if employee is viewing
-    if (!isDriver && vehiclesToShow.length > 0) {
-      setSelectedVehicle(vehiclesToShow[0]);
+    const reverseGeocode = async (lat: number, lng: number) => {
+      try {
+        const response = await axios.get(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`
+        );
+        return response.data.display_name;
+      } catch (error) {
+        return "Unknown location";
+      }
+    };
+    if (driverLatLng) {
+      reverseGeocode(driverLatLng[0], driverLatLng[1]).then(setCarLocationName);
     }
+  }, [driverLatLng]);
 
-  }, [map, vehicles, employeeLocation, isDriver]);
+  // Calculate ETA string
+  const etaString = eta
+    ? eta < 60
+      ? "Less than a minute"
+      : `${Math.round(eta / 60)} min`
+    : "--";
+
+  // Calculate distance string
+  const distanceString = distance ? `${(distance / 1000).toFixed(2)} km` : "--";
+
+  // Center map on employee or driver or default
+  const center =
+    employeeLatLng || driverLatLng || [9.0155, 38.7632];
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="relative flex-grow" style={{ minHeight: '400px' }}>
-        {/* This div would contain the actual map */}
-        <div ref={mapContainerRef} className="w-full h-full bg-gray-200 rounded-md">
-          {/* Placeholder content - this would be replaced by actual map */}
-          <div className="h-full w-full flex items-center justify-center">
-            <p className="text-gray-500">Map Loading... This is a placeholder for the actual map interface.</p>
-          </div>
-        </div>
-        
-        {/* Bottom info panel for distance and ETA when employee is viewing */}
-        {!isDriver && selectedVehicle && (
-          <div className="absolute bottom-4 left-0 right-0 mx-auto w-11/12 md:w-2/3 lg:w-1/2">
-            <Card>
-              <CardContent className="p-4">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Driver</span>
-                    <span className="font-medium">{selectedVehicle.driverName}</span>
-                  </div>
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">Distance</span>
-                    <span className="font-medium">
-                      {(calculateDistance(
-                        selectedVehicle.location, 
-                        employeeLocation || mockEmployeeLocation
-                      ) / 1000).toFixed(1)} km
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-center justify-center">
-                    <span className="text-xs text-muted-foreground">ETA</span>
-                    <span className="font-medium">
-                      {calculateETA(
-                        calculateDistance(
-                          selectedVehicle.location, 
-                          employeeLocation || mockEmployeeLocation
-                        ),
-                        selectedVehicle.location.speed || 0
-                      )}
-                    </span>
-                  </div>
+      <div className="relative flex-grow" style={{ minHeight: "400px" }}>
+        <MapContainer
+          center={center as [number, number]}
+          zoom={14}
+          style={{ height: "400px", width: "100%" }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; OpenStreetMap contributors"
+          />
+          {employeeLatLng && (
+            <Marker position={employeeLatLng} icon={userIcon}>
+              <Popup>You (Employee)</Popup>
+            </Marker>
+          )}
+          {driverLatLng && (
+            <Marker position={driverLatLng} icon={carIcon}>
+              <Popup>
+                Driver<br />
+                {carLocationName && (
+                  <>
+                    <span className="font-semibold">Location:</span> {carLocationName}
+                    <br />
+                  </>
+                )}
+                Lat: {driverLatLng[0].toFixed(6)}, Lng: {driverLatLng[1].toFixed(6)}
+              </Popup>
+            </Marker>
+          )}
+          {route.length > 0 && <Polyline positions={route} color="blue" />}
+        </MapContainer>
+
+        {/* Info panel */}
+        <div className="absolute bottom-4 left-0 right-0 mx-auto w-11/12 md:w-2/3 lg:w-1/2">
+          <Card>
+            <CardContent className="p-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="flex flex-col items-center justify-center">
+                  <span className="text-xs text-muted-foreground">Distance</span>
+                  <span className="font-medium">{distanceString}</span>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-        
-        {/* Vehicle selection for employees if there are multiple vehicles */}
-        {!isDriver && vehicles && vehicles.length > 1 && (
-          <div className="absolute top-4 right-4">
-            {/* Vehicle selection UI would go here */}
-          </div>
-        )}
+                <div className="flex flex-col items-center justify-center">
+                  <span className="text-xs text-muted-foreground">ETA</span>
+                  <span className="font-medium">{etaString}</span>
+                </div>
+                <div className="flex flex-col items-center justify-center">
+                  <span className="text-xs text-muted-foreground">Driver Location</span>
+                  <span className="font-medium">{carLocationName || "--"}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-      
       {/* Driver-specific controls */}
       {isDriver && (
         <Card className="mt-4">
@@ -237,6 +217,9 @@ const MapComponent: React.FC<MapComponentProps> = ({
             </div>
           </CardContent>
         </Card>
+      )}
+      {error && (
+        <div className="text-red-500 text-center mt-2">{error}</div>
       )}
     </div>
   );

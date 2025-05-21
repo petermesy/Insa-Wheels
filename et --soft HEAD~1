@@ -1,0 +1,7 @@
+[33ma148b09[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m feat: Add car assignment page and real-time location updates
+[33mb1b3d42[m Refactor: Split AdminDashboard into smaller components
+[33m11de1c0[m feat: Enhance admin dashboard with card components
+[33mb2a155e[m feat: Integrate frontend with backend and database
+[33m14fd1d9[m[33m ([m[1;31morigin/Backend[m[33m)[m feat: Create Node.js/Express backend
+[33m5954018[m[33m ([m[1;32mBackend[m[33m)[m Implement insa-wheels_tracker website
+[33macabe6e[m Use tech stack vite_react_shadcn_ts

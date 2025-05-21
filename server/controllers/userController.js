@@ -21,7 +21,7 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-const getUserById = async (req, res) => {
+const getUserByIdd = async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -160,7 +160,7 @@ const updateUserLocation = async (req, res) => {
 
 module.exports = {
   getAllUsers,
-  getUserById,
+  getUserById: getUserByIdd,
   getUsersByRole,
   createUser,
   updateUser,
