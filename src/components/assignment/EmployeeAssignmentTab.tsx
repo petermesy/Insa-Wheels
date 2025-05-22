@@ -18,7 +18,7 @@ import { Car, UserCircle, Users } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import EmployeeAssignmentForm from './EmployeeAssignmentForm';
-
+const API_URL = import.meta.env.VITE_API_URL;
 interface EmployeeAssignmentTabProps {
   employees: any[];
   vehicles: any[];
@@ -41,7 +41,7 @@ const EmployeeAssignmentTab: React.FC<EmployeeAssignmentTabProps> = ({
 
   const handleAssignEmployee = async (vehicleId: number, employeeId: number) => {
     try {
-      await axios.post(`http://localhost:4000/api/vehicles/${vehicleId}/assign`, 
+      await axios.post(`${API_URL}/api/vehicles/${vehicleId}/assign`, 
         { employeeId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
