@@ -23,7 +23,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-
+const API_URL = import.meta.env.VITE_API_URL;
 const formSchema = z.object({
   email: z.string().email({
     message: 'Please enter a valid email address.',
