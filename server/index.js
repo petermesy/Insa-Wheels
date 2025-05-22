@@ -19,15 +19,15 @@ const server = http.createServer(app);
 const io = socketIo(server, { cors: { origin: '*' } });
 app.set('io', io);
 
-// Socket.IO room join/leave logic
-io.on('connection', (socket) => {
-  socket.on('joinRoom', (room) => {
-    socket.join(room);
-  });
-  socket.on('leaveRoom', (room) => {
-    socket.leave(room);
-  });
-});
+// // Socket.IO room join/leave logic
+// io.on('connection', (socket) => {
+//   socket.on('joinRoom', (room) => {
+//     socket.join(room);
+//   });
+//   socket.on('leaveRoom', (room) => {
+//     socket.leave(room);
+//   });
+// });
 
 app.use('/api/locations', locationRoutes);
 // Middleware
