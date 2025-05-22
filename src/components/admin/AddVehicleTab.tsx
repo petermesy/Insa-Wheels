@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import VehicleForm, { VehicleFormData } from './VehicleForm';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface AddVehicleTabProps {
   drivers: any[];
