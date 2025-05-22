@@ -19,6 +19,7 @@ import { Car, User } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import VehicleAssignmentForm from './VehicleAssignmentForm';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface VehicleAssignmentTabProps {
   vehicles: any[];
@@ -40,7 +41,7 @@ const VehicleAssignmentTab: React.FC<VehicleAssignmentTabProps> = ({
 
   const handleAssignDriver = async (vehicleId: number, driverId: number) => {
     try {
-      await axios.put(`http://localhost:4000/api/vehicles/${vehicleId}`, 
+      await axios.put(`${API_URL}/api/vehicles/${vehicleId}`, 
         { 
           type: vehicles.find(v => v.id === vehicleId).type,
           licensePlate: vehicles.find(v => v.id === vehicleId).license_plate,
