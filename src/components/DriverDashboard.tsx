@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL;
+
 import {
   Card,
   CardContent,
@@ -38,7 +40,8 @@ const DriverDashboard: React.FC = () => {
     queryKey: ['driverVehicle'],
     queryFn: async () => {
       const response = await axios.get(
-        `http://localhost:4000/api/vehicles`,
+        // `http://localhost:4000/api/vehicles`,
+        `${API_URL}/vehicles`,
         { headers }
       );
       return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id));
@@ -111,7 +114,8 @@ const DriverDashboard: React.FC = () => {
       const speed = Math.floor(Math.random() * 60);
       
       await axios.put(
-        `http://localhost:4000/api/vehicles/${vehicleId}/location`,
+        // `http://localhost:4000/api/vehicles/${vehicleId}/location`,
+        `${API_URL}/api/vehicles/${vehicleId}/location`,
         { latitude, longitude, speed },
         { headers }
       );
@@ -137,7 +141,8 @@ const DriverDashboard: React.FC = () => {
   const updateDriverLocation = async (latitude: number, longitude: number) => {
     try {
       await axios.put(
-        `http://localhost:4000/api/users/${userInfo.id}/location`,
+        // `http://localhost:4000/api/users/${userInfo.id}/location`,
+        `${API_URL}/api/users/${userInfo.id}/location`,
         { latitude, longitude },
         { headers }
       );

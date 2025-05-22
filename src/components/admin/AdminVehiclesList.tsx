@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import VehicleCard from './VehicleCard';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface AdminVehiclesListProps {
   vehicles: any[];
@@ -27,7 +28,7 @@ const AdminVehiclesList: React.FC<AdminVehiclesListProps> = ({ vehicles, drivers
   const handleDeleteVehicle = async (vehicleId: string) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`http://localhost:4000/api/vehicles/${vehicleId}`, { headers });
+      await axios.delete(`${API_URL}/api/vehicles/${vehicleId}`, { headers });
       toast({
         title: 'Success',
         description: 'Vehicle deleted successfully',

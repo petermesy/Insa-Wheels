@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL;
 import {
   Card,
   CardContent,
@@ -42,7 +43,9 @@ const AdminDashboard: React.FC = () => {
   } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:4000/api/users', {
+
+      // const response = await axios.get('http://localhost:4000/api/users', {
+      const response = await axios.get(`${API_URL}/api/users`, {
         headers,
       });
       return response.data;
@@ -58,7 +61,8 @@ const AdminDashboard: React.FC = () => {
   } = useQuery({
     queryKey: ['vehicles'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:4000/api/vehicles', {
+      // const response = await axios.get('http://localhost:4000/api/vehicles', {
+      const response = await axios.get(`${API_URL}/vehicles`, {
         headers,
       });
       return response.data;

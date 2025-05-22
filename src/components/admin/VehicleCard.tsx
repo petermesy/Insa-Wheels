@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import { Bus, Car, Truck, Trash2, Edit } from 'lucide-react';
+const API_URL = import.meta.env.VITE_API_URL;
 
 // Vehicle form schema
 const vehicleFormSchema = z.object({
@@ -62,7 +63,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, drivers, onDelete, o
   const handleUpdate = async (data: VehicleFormData) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`http://localhost:4000/api/vehicles/${vehicle.id}`, data, { headers });
+      await axios.put(`${API_URL}/api/vehicles/${vehicle.id}`, data, { headers });
       toast({
         title: 'Success',
         description: 'Vehicle updated successfully',

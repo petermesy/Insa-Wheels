@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+const API_URL = import.meta.env.VITE_API_URL;
+
 import {
   Card,
   CardContent,
@@ -13,7 +15,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { io } from 'socket.io-client';
 
-const socket = io('http://localhost:4000');
+// const socket = io('http://localhost:4000');
+const socket = io(`${API_URL}`);
 
 const EmployeeDashboard: React.FC = () => {
   const { toast } = useToast();
@@ -38,7 +41,10 @@ const EmployeeDashboard: React.FC = () => {
   } = useQuery({
     queryKey: ['employeeVehicles'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:4000/api/vehicles', { headers });
+      const response = await axios.get(
+        // 'http://localhost:4000/api/vehicles', 
+        `${API_URL}/api/vehicles`, 
+        { headers });
       return response.data.filter((vehicle: any) =>
         vehicle.assigned_employees &&
         vehicle.assigned_employees.includes(parseInt(userInfo.id))
@@ -53,7 +59,10 @@ const EmployeeDashboard: React.FC = () => {
   } = useQuery({
     queryKey: ['drivers'],
     queryFn: async () => {
-      const response = await axios.get('http://localhost:4000/api/users/role/driver', { headers });
+      const response = await axios.get(
+        // 'http://localhost:4000/api/users/role/driver', 
+        `${API_URL}/api/users/role/driver`, 
+        { headers });
       return response.data;
     },
   });
@@ -104,7 +113,7 @@ const EmployeeDashboard: React.FC = () => {
   const updateEmployeeLocation = async (latitude: number, longitude: number) => {
     try {
       await axios.put(
-        `http://localhost:4000/api/users/${userInfo.id}/location`,
+        `${API_URL}/api/users/${userInfo.id}/location`,
         { latitude, longitude },
         { headers }
       );

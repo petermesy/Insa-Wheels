@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import { User, Trash2, Edit } from 'lucide-react';
+const API_URL = import.meta.env.VITE_API_URL;
 
 // User form schema
 const userFormSchema = z.object({
@@ -53,7 +54,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, onDelete, onUpdate }) => {
   const handleUpdate = async (data: UserFormData) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`http://localhost:4000/api/users/${user.id}`, data, { headers });
+      await axios.put(`${API_URL}/api/users/${user.id}`, data, { headers });
       toast({
         title: 'Success',
         description: 'User updated successfully',

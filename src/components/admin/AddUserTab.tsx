@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import UserForm, { UserFormData } from './UserForm';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface AddUserTabProps {
   refetchUsers: () => void;
@@ -16,7 +17,7 @@ const AddUserTab: React.FC<AddUserTabProps> = ({ refetchUsers }) => {
   const handleSubmit = async (data: UserFormData) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.post('http://localhost:4000/api/users', data, { headers });
+      await axios.post(`${API_URL}/api/users`, data, { headers });
       toast({
         title: 'Success',
         description: 'User created successfully',

@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 import UserCard from './UserCard';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface AdminUsersListProps {
   users: any[];
@@ -29,7 +30,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({ users, refetchUsers, ti
   const handleDeleteUser = async (userId: string) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`http://localhost:4000/api/users/${userId}`, { headers });
+      await axios.delete(`${API_URL}/api/users/${userId}`, { headers });
       toast({
         title: 'Success',
         description: 'User deleted successfully',
