@@ -25,6 +25,7 @@ import {
 const vehicleFormSchema = z.object({
   type: z.string().min(2, 'Type must be at least 2 characters'),
   licensePlate: z.string().min(2, 'License plate must be at least 2 characters'),
+  destination: z.string().min(2, 'Destination must be at least 2 characters'),
   driverId: z.string().min(1, 'Driver must be selected'),
 });
 
@@ -42,6 +43,7 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, drivers, defaultVal
     defaultValues: {
       type: '',
       licensePlate: '',
+      destination:'',
       driverId: '',
       ...defaultValues
     },
@@ -69,6 +71,19 @@ const VehicleForm: React.FC<VehicleFormProps> = ({ onSubmit, drivers, defaultVal
           render={({ field }) => (
             <FormItem>
               <FormLabel>License Plate</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="destination"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Destination</FormLabel>
               <FormControl>
                 <Input {...field} />
               </FormControl>

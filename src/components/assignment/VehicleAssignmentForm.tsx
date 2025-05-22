@@ -65,6 +65,7 @@ const VehicleAssignmentForm: React.FC<VehicleAssignmentFormProps> = ({
                 {vehicles.map((vehicle) => (
                   <SelectItem key={vehicle.id} value={vehicle.id.toString()}>
                     {vehicle.type} ({vehicle.license_plate})
+                    {vehicle.type} ({vehicle.destination})
                   </SelectItem>
                 ))}
               </SelectContent>

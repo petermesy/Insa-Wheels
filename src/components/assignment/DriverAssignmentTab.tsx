@@ -74,7 +74,7 @@ const DriverAssignmentTab: React.FC<DriverAssignmentTabProps> = ({
                         <span className="font-medium">{driver.name}</span>
                         {vehicle && (
                           <span className="ml-2 text-sm text-gray-500">
-                            - Driving: {vehicle.type} ({vehicle.license_plate})
+                            - Driving: {vehicle.type} ({vehicle.license_plate}) ({vehicle.destination})
                           </span>
                         )}
                       </div>
@@ -90,6 +90,7 @@ const DriverAssignmentTab: React.FC<DriverAssignmentTabProps> = ({
                             <div className="bg-gray-50 p-3 rounded-md">
                               <p><strong>Type:</strong> {vehicle.type}</p>
                               <p><strong>License Plate:</strong> {vehicle.license_plate}</p>
+                              <p><strong>Destination:</strong> {vehicle.destination}</p>
                             </div>
                           ) : (
                             <p className="text-gray-500">No vehicle assigned</p>

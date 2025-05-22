@@ -44,6 +44,7 @@ const VehicleAssignmentTab: React.FC<VehicleAssignmentTabProps> = ({
         { 
           type: vehicles.find(v => v.id === vehicleId).type,
           licensePlate: vehicles.find(v => v.id === vehicleId).license_plate,
+          destination: vehicles.find(v => v.id === vehicleId).destination,
           driverId
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -87,12 +88,12 @@ const VehicleAssignmentTab: React.FC<VehicleAssignmentTabProps> = ({
                     <TableHead>Vehicle</TableHead>
                     <TableHead>License Plate</TableHead>
                     <TableHead>Assigned Driver</TableHead>
-                  </TableRow>
+                   <TableHead>Destination</TableHead></TableRow>
                 </TableHeader>
                 <TableBody>
                   {vehicles.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={3} className="text-center">No vehicles found</TableCell>
+                      <TableCell colSpan={4} className="text-center">No vehicles found</TableCell>
                     </TableRow>
                   ) : (
                     vehicles.map((vehicle) => (
@@ -111,6 +112,7 @@ const VehicleAssignmentTab: React.FC<VehicleAssignmentTabProps> = ({
                             <span className="text-gray-500">Not assigned</span>
                           )}
                         </TableCell>
+                        <TableCell>{vehicle.destination}</TableCell>
                       </TableRow>
                     ))
                   )}

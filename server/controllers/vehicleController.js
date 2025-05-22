@@ -37,31 +37,35 @@ const getVehicleById = async (req, res) => {
 };
 
 const createVehicle = async (req, res) => {
-  const { type, licensePlate, driverId } = req.body;
+  const { type, licensePlate,destination, driverId } = req.body;
   
-  if (!type || !licensePlate || !driverId) {
-    return res.status(400).json({ error: 'Type, license plate, and driver ID are required' });
+  if (!type || !licensePlate || !destination|| !driverId) {
+    return res.status(400).json({ error: 'Type, license plate,destination and driver ID are required' });
   }
   
   try {
-    const newVehicle = await addVehicle({ type, licensePlate, driverId });
+    const newVehicle = await addVehicle({ type, licensePlate,destination, driverId });
     res.status(201).json(newVehicle);
   } catch (error) {
     console.error('Error creating vehicle:', error);
+
+        if (error.code === '23505' && error.detail && error.detail.includes('license_plate')) {
+      return res.status(400).json({ error: 'A vehicle with this license plate already exists.' });
+    }
     res.status(500).json({ error: 'Server error' });
   }
 };
 
 const updateVehicle = async (req, res) => {
   const { id } = req.params;
-  const { type, licensePlate, driverId } = req.body;
+  const { type, licensePlate,destination, driverId } = req.body;
   
-  if (!type || !licensePlate || !driverId) {
-    return res.status(400).json({ error: 'Type, license plate, and driver ID are required' });
+  if (!type || !licensePlate || !destination|| !driverId) {
+    return res.status(400).json({ error: 'Type, license plate, destination and driver ID are required' });
   }
   
   try {
-    const updatedVehicle = await updateVehicleById(id, { type, licensePlate, driverId });
+    const updatedVehicle = await updateVehicleById(id, { type, licensePlate, destination, driverId });
     res.json(updatedVehicle);
   } catch (error) {
     console.error('Error updating vehicle:', error);

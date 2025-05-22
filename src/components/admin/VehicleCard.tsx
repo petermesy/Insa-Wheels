@@ -18,6 +18,7 @@ import { Bus, Car, Truck, Trash2, Edit } from 'lucide-react';
 const vehicleFormSchema = z.object({
   type: z.string().min(2, 'Type must be at least 2 characters'),
   licensePlate: z.string().min(2, 'License plate must be at least 2 characters'),
+  destination: z.string().min(2, 'License plate must be at least 2 characters'),
   driverId: z.string().min(1, 'Driver must be selected'),
 });
 
@@ -42,6 +43,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, drivers, onDelete, o
     defaultValues: {
       type: vehicle.type,
       licensePlate: vehicle.licensePlate,
+      destination: vehicle.destination,
       driverId: vehicle.driverId,
     },
   });
@@ -161,6 +163,19 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, drivers, onDelete, o
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>License Plate</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="destination"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Destination</FormLabel>
                     <FormControl>
                       <Input {...field} />
                     </FormControl>

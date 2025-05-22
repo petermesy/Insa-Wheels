@@ -44,11 +44,11 @@ const getVehicleByDriverId = async (driverId) => {
 };
 
 const addVehicle = async (vehicleData) => {
-  const { type, licensePlate, driverId } = vehicleData;
+  const { type, licensePlate,destination, driverId } = vehicleData;
   
   const result = await db.query(
-    'INSERT INTO vehicles (type, license_plate, driver_id) VALUES ($1, $2, $3) RETURNING *',
-    [type, licensePlate, driverId]
+    'INSERT INTO vehicles (type, license_plate,destination, driver_id) VALUES ($1, $2, $3,$4) RETURNING *',
+    [type, licensePlate,destination, driverId]
   );
   
   // Get the newly created vehicle with assigned employees (which will be empty)
@@ -59,7 +59,7 @@ const addVehicle = async (vehicleData) => {
 };
 
 const updateVehicleById = async (id, vehicleData) => {
-  const { type, licensePlate, driverId } = vehicleData;
+  const { type, licensePlate,destination, driverId } = vehicleData;
   
   // Check if vehicle exists
   const vehicle = await getVehicleById(id);
@@ -67,10 +67,10 @@ const updateVehicleById = async (id, vehicleData) => {
     throw new Error('Vehicle not found');
   }
   
-  const result = await db.query(
-    'UPDATE vehicles SET type = $1, license_plate = $2, driver_id = $3 WHERE id = $4 RETURNING *',
-    [type, licensePlate, driverId, id]
-  );
+const result = await db.query(
+  'UPDATE vehicles SET type = $1, license_plate = $2, driver_id = $3, destination = $4 WHERE id = $5 RETURNING *',
+  [type, licensePlate, driverId, destination, id]
+);
   
   // Get the updated vehicle with assigned employees
   return getVehicleById(id);
