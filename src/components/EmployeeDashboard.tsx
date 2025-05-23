@@ -43,7 +43,7 @@ const EmployeeDashboard: React.FC = () => {
     queryFn: async () => {
       const response = await axios.get(
         // 'http://localhost:4000/api/vehicles', 
-        `${API_URL}/api/vehicles`, 
+        `${API_URL}/vehicles`, 
         { headers });
       return response.data.filter((vehicle: any) =>
         vehicle.assigned_employees &&
