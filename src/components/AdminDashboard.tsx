@@ -45,7 +45,7 @@ const AdminDashboard: React.FC = () => {
     queryFn: async () => {
 
       // const response = await axios.get('http://localhost:4000/api/users', {
-      const response = await axios.get(`${API_URL}/api/users`, {
+      const response = await axios.get(`${API_URL}/users`, {
         headers,
       });
       return response.data;
