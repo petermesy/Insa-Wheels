@@ -41,7 +41,7 @@ const EmployeeAssignmentTab: React.FC<EmployeeAssignmentTabProps> = ({
 
   const handleAssignEmployee = async (vehicleId: number, employeeId: number) => {
     try {
-      await axios.post(`${API_URL}/api/vehicles/${vehicleId}/assign`, 
+      await axios.post(`${API_URL}/vehicles/${vehicleId}/assign`, 
         { employeeId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
