@@ -28,7 +28,7 @@ const AdminVehiclesList: React.FC<AdminVehiclesListProps> = ({ vehicles, drivers
   const handleDeleteVehicle = async (vehicleId: string) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`${API_URL}/api/vehicles/${vehicleId}`, { headers });
+      await axios.delete(`${API_URL}/vehicles/${vehicleId}`, { headers });
       toast({
         title: 'Success',
         description: 'Vehicle deleted successfully',
