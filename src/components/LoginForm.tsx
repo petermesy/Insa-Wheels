@@ -23,6 +23,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+
 const API_URL = import.meta.env.VITE_API_URL;
 const formSchema = z.object({
   email: z.string().email({
@@ -48,7 +49,7 @@ const LoginForm: React.FC = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       // Call our backend API
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
