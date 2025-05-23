@@ -30,7 +30,7 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({ users, refetchUsers, ti
   const handleDeleteUser = async (userId: string) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.delete(`${API_URL}/api/users/${userId}`, { headers });
+      await axios.delete(`${API_URL}/users/${userId}`, { headers });
       toast({
         title: 'Success',
         description: 'User deleted successfully',
