@@ -42,7 +42,7 @@ const VehicleAssignmentTab: React.FC<VehicleAssignmentTabProps> = ({
   const handleAssignDriver = async (vehicleId: number, driverId: number) => {
     try {
       
-      await axios.put(`${API_URL}/api/vehicles/${vehicleId}`, 
+      await axios.put(`${API_URL}/vehicles/${vehicleId}`, 
         { 
           type: vehicles.find(v => v.id === vehicleId).type,
           licensePlate: vehicles.find(v => v.id === vehicleId).license_plate,
