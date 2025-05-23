@@ -40,7 +40,7 @@ const AssignmentDashboard: React.FC = () => {
     queryKey: ['users'],
     queryFn: async () => {
       // const response = await axios.get('http://localhost:4000/api/users', {
-      const response = await axios.get(`${API_URL}/api/users`, {
+      const response = await axios.get(`${API_URL}/users`, {
         headers,
       });
       return response.data;
@@ -57,7 +57,7 @@ const AssignmentDashboard: React.FC = () => {
     queryKey: ['vehicles'],
     queryFn: async () => {
       // const response = await axios.get('http://localhost:4000/api/vehicles', {
-      const response = await axios.get(`${API_URL}/api/vehicles`, {
+      const response = await axios.get(`${API_URL}/vehicles`, {
         headers,
       });
       return response.data;
