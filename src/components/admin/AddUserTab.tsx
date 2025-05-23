@@ -17,7 +17,7 @@ const AddUserTab: React.FC<AddUserTabProps> = ({ refetchUsers }) => {
   const handleSubmit = async (data: UserFormData) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.post(`${API_URL}/api/users`, data, { headers });
+      await axios.post(`${API_URL}/users`, data, { headers });
       toast({
         title: 'Success',
         description: 'User created successfully',
