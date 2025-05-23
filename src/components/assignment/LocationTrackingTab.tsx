@@ -9,6 +9,7 @@ import {
 import { io, Socket } from 'socket.io-client';
 import { Car, Navigation, Clock, MapPin } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+const API_URL = import.meta.env.VITE_API_URL;
 
 interface Location {
   coords: [number, number];
@@ -34,7 +35,7 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
 
   // Initialize Socket.io connection
   useEffect(() => {
-    const newSocket = io('http://localhost:4000');
+    const newSocket = io(`${API_URL}`);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
