@@ -18,7 +18,7 @@ const AddVehicleTab: React.FC<AddVehicleTabProps> = ({ drivers, refetchVehicles 
   const handleSubmit = async (data: VehicleFormData) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.post(`${API_URL}/api/vehicles`, data, { headers });
+      await axios.post(`${API_URL}/vehicles`, data, { headers });
       toast({
         title: 'Success',
         description: 'Vehicle created successfully',
