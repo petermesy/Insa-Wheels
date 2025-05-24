@@ -63,7 +63,7 @@ const VehicleCard: React.FC<VehicleCardProps> = ({ vehicle, drivers, onDelete, o
   const handleUpdate = async (data: VehicleFormData) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`${API_URL}/api/vehicles/${vehicle.id}`, data, { headers });
+      await axios.put(`${API_URL}/vehicles/${vehicle.id}`, data, { headers });
       toast({
         title: 'Success',
         description: 'Vehicle updated successfully',

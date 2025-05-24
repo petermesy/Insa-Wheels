@@ -37,6 +37,8 @@ const AdminUsersList: React.FC<AdminUsersListProps> = ({ users, refetchUsers, ti
       });
       refetchUsers();
     } catch (error: any) {
+      console.log(error);
+      
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to delete user',

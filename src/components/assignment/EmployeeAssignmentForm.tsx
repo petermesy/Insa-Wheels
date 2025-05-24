@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { 
+import {
   Card,
   CardContent,
   CardHeader,
@@ -34,7 +34,7 @@ const EmployeeAssignmentForm: React.FC<EmployeeAssignmentFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVehicleId || !selectedEmployeeId) return;
-    
+
     setIsSubmitting(true);
     try {
       await onAssign(Number(selectedVehicleId), Number(selectedEmployeeId));
@@ -47,10 +47,10 @@ const EmployeeAssignmentForm: React.FC<EmployeeAssignmentFormProps> = ({
   // Filter out employees that are already assigned to the selected vehicle
   const getAvailableEmployees = () => {
     if (!selectedVehicleId) return employees;
-    
+
     const vehicle = vehicles.find(v => v.id === Number(selectedVehicleId));
     if (!vehicle || !vehicle.assigned_employees) return employees;
-    
+
     return employees.filter(e => !vehicle.assigned_employees.includes(e.id));
   };
 
@@ -77,12 +77,14 @@ const EmployeeAssignmentForm: React.FC<EmployeeAssignmentFormProps> = ({
                 {vehicles.map((vehicle) => (
                   <SelectItem key={vehicle.id} value={vehicle.id.toString()}>
                     {vehicle.type} ({vehicle.license_plate})
+                    {vehicle.type} ({vehicle.destination})
+
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="space-y-2">
             <Label htmlFor="employee">Select Employee</Label>
             <Select
@@ -102,9 +104,9 @@ const EmployeeAssignmentForm: React.FC<EmployeeAssignmentFormProps> = ({
               </SelectContent>
             </Select>
           </div>
-          
-          <Button 
-            type="submit" 
+
+          <Button
+            type="submit"
             className="w-full"
             disabled={!selectedVehicleId || !selectedEmployeeId || isSubmitting}
           >

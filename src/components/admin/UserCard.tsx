@@ -54,7 +54,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, onDelete, onUpdate }) => {
   const handleUpdate = async (data: UserFormData) => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`${API_URL}/api/users/${user.id}`, data, { headers });
+      await axios.put(`${API_URL}/users/${user.id}`, data, { headers });
       toast({
         title: 'Success',
         description: 'User updated successfully',

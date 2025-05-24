@@ -35,6 +35,8 @@ const AdminVehiclesList: React.FC<AdminVehiclesListProps> = ({ vehicles, drivers
       });
       refetchVehicles();
     } catch (error: any) {
+      console.log(error);
+      
       toast({
         title: 'Error',
         description: error.response?.data?.error || 'Failed to delete vehicle',
