@@ -39,7 +39,7 @@ const DriverDashboard: React.FC = () => {
     queryKey: ['driverVehicle'],
     queryFn: async () => {
       const response = await axios.get(`${API_URL}/vehicles`, { headers });
-      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id))||null;
+      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id)) || null;
     },
   });
 
@@ -61,19 +61,34 @@ const DriverDashboard: React.FC = () => {
   };
 
   // Update vehicle location
-  const updateVehicleLocation = async (vehicleId: number, latitude: number, longitude: number, speed?: number | null, altitude?: number | null) => {
+  const updateVehicleLocation = async (
+    vehicleId: number,
+    latitude: number,
+    longitude: number,
+    speed?: number | null,
+    altitude?: number | null
+  ) => {
     try {
       await axios.put(
         `${API_URL}/vehicles/${vehicleId}/location`,
         { latitude, longitude, speed, altitude },
         { headers }
       );
-      setStatus('Location sent!');
-      toast({ title: 'Location Updated', description: 'Vehicle location has been updated successfully.' });
+      setStatus('Location sent to employees!');
+      toast({
+        title: 'Location Sent',
+        description: `Location sent to employees: (${latitude}, ${longitude})`,
+      });
+      // Console log the location
+      console.log('Driver location sent:', { latitude, longitude, speed, altitude });
       refetchVehicle();
     } catch (error: any) {
       setStatus('Failed to send location');
-      toast({ title: 'Update Error', description: 'Failed to update vehicle location.', variant: 'destructive' });
+      toast({
+        title: 'Update Error',
+        description: 'Failed to update vehicle location.',
+        variant: 'destructive',
+      });
     }
     setIsUpdatingLocation(false);
   };
@@ -108,17 +123,31 @@ const DriverDashboard: React.FC = () => {
           } catch {
             setAddress('Unknown location');
           }
-          updateVehicleLocation(vehicleData.id, latitude, longitude, speed ?? null, altitude ?? null);
+          await updateVehicleLocation(
+            vehicleData.id,
+            latitude,
+            longitude,
+            speed ?? null,
+            altitude ?? null
+          );
         },
         (error) => {
           setStatus('Could not get your current location.');
-          toast({ title: 'Location Error', description: 'Could not get your current location.', variant: 'destructive' });
+          toast({
+            title: 'Location Error',
+            description: 'Could not get your current location.',
+            variant: 'destructive',
+          });
           setIsUpdatingLocation(false);
         }
       );
     } else {
       setStatus('Geolocation not supported');
-      toast({ title: 'Geolocation Not Supported', description: 'Your browser does not support geolocation.', variant: 'destructive' });
+      toast({
+        title: 'Geolocation Not Supported',
+        description: 'Your browser does not support geolocation.',
+        variant: 'destructive',
+      });
       setIsUpdatingLocation(false);
     }
   };

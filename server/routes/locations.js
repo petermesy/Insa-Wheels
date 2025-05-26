@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { validateToken } = require('../middleware/auth');
+const db = require('../config/db');
 
 // Apply auth middleware to most routes
 router.use(validateToken);
@@ -26,10 +27,27 @@ router.post('/car-location', async (req, res) => {
       timestamp: new Date()
     };
 
-    // (You can add your logic to emit to assigned employees here)
-    io.emit('carLocationUpdate', locationData);
+    // Find the vehicle for this driver
+    const vehicleRes = await db.query(
+      `SELECT id, 
+              ARRAY(
+                SELECT ve.employee_id 
+                FROM vehicle_employees ve 
+                WHERE ve.vehicle_id = v.id
+              ) as assigned_employees 
+         FROM vehicles v 
+         WHERE driver_id = $1`,
+      [driverId]
+    );
+    const vehicle = vehicleRes.rows[0];
 
-    console.log('Location update received:', locationData);
+    if (vehicle && vehicle.assigned_employees) {
+      for (const employeeId of vehicle.assigned_employees) {
+        io.to(`employee_${employeeId}`).emit('carLocationUpdate', locationData);
+      }
+    }
+
+    console.log('Location update received and sent to employees:', locationData);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error updating location:', error);
