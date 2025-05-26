@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
@@ -17,11 +16,11 @@ import MapComponent from './MapComponent';
 
 const DriverDashboard: React.FC = () => {
   const { toast } = useToast();
-  const [currentLocation, setCurrentLocation] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; speed?: number | null; altitude?: number | null } | null>(null);
+  const [address, setAddress] = useState<string>('');
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+  const [assignedEmployees, setAssignedEmployees] = useState<any[]>([]);
+  const [status, setStatus] = useState<string>('Waiting...');
 
   const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
   const token = localStorage.getItem('auth_token');
@@ -39,129 +38,100 @@ const DriverDashboard: React.FC = () => {
   } = useQuery({
     queryKey: ['driverVehicle'],
     queryFn: async () => {
-      const response = await axios.get(
-        // `http://localhost:4000/api/vehicles`,
-        `${API_URL}/vehicles`,
-        { headers }
-      );
-      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id));
+      const response = await axios.get(`${API_URL}/vehicles`, { headers });
+      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id))||null;
     },
   });
 
-  // Get current location
-  const requestLocation = () => {
+  // Fetch assigned employees
+  const fetchAssignedEmployees = async (employeeIds: number[]) => {
+    if (!employeeIds || employeeIds.length === 0) {
+      setAssignedEmployees([]);
+      return;
+    }
+    try {
+      const res = await axios.get(`${API_URL}/users`, { headers });
+      const employees = res.data.filter((u: any) =>
+        employeeIds.map(Number).includes(Number(u.id))
+      );
+      setAssignedEmployees(employees);
+    } catch {
+      setAssignedEmployees([]);
+    }
+  };
+
+  // Update vehicle location
+  const updateVehicleLocation = async (vehicleId: number, latitude: number, longitude: number, speed?: number | null, altitude?: number | null) => {
+    try {
+      await axios.put(
+        `${API_URL}/vehicles/${vehicleId}/location`,
+        { latitude, longitude, speed, altitude },
+        { headers }
+      );
+      setStatus('Location sent!');
+      toast({ title: 'Location Updated', description: 'Vehicle location has been updated successfully.' });
+      refetchVehicle();
+    } catch (error: any) {
+      setStatus('Failed to send location');
+      toast({ title: 'Update Error', description: 'Failed to update vehicle location.', variant: 'destructive' });
+    }
+    setIsUpdatingLocation(false);
+  };
+
+  // Get and send location
+  const getAndSendLocation = () => {
+    if (!vehicleData?.id) {
+      setStatus('No assigned vehicle found.');
+      setIsUpdatingLocation(false);
+      return;
+    }
+    setIsUpdatingLocation(true);
+    setStatus('Getting location...');
     if (navigator.geolocation) {
-      setIsUpdatingLocation(true);
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          setCurrentLocation({ latitude, longitude });
-          
-          if (vehicleData) {
-            updateVehicleLocation(vehicleData.id, latitude, longitude);
-          } else {
-            updateDriverLocation(latitude, longitude);
-            toast({
-              title: 'Location Updated',
-              description: 'Your location has been updated but no vehicle is assigned to you.',
-            });
-            setIsUpdatingLocation(false);
+        async (position) => {
+          const { latitude, longitude, speed, altitude } = position.coords;
+          setCurrentLocation({ latitude, longitude, speed: speed ?? null, altitude: altitude ?? null });
+          // Reverse geocode for address
+          try {
+            const geoRes = await axios.get(
+              `https://nominatim.openstreetmap.org/reverse`,
+              {
+                params: {
+                  lat: latitude,
+                  lon: longitude,
+                  format: 'json',
+                },
+              }
+            );
+            setAddress(geoRes.data.display_name || 'Unknown location');
+          } catch {
+            setAddress('Unknown location');
           }
+          updateVehicleLocation(vehicleData.id, latitude, longitude, speed ?? null, altitude ?? null);
         },
         (error) => {
-          console.error('Error getting location:', error);
-          toast({
-            title: 'Location Error',
-            description: 'Could not get your current location.',
-            variant: 'destructive',
-          });
+          setStatus('Could not get your current location.');
+          toast({ title: 'Location Error', description: 'Could not get your current location.', variant: 'destructive' });
           setIsUpdatingLocation(false);
-          
-          // Fallback to simulated position
-          simulateLocation();
         }
       );
     } else {
-      toast({
-        title: 'Geolocation Not Supported',
-        description: 'Your browser does not support geolocation.',
-        variant: 'destructive',
-      });
-      // Fallback to simulated position
-      simulateLocation();
-    }
-  };
-
-  const simulateLocation = () => {
-    // Simulate a location around INSA area
-    setCurrentLocation({
-      latitude: 9.0105 + (Math.random() * 0.01 - 0.005),
-      longitude: 38.7652 + (Math.random() * 0.01 - 0.005),
-    });
-    
-    if (vehicleData) {
-      updateVehicleLocation(
-        vehicleData.id,
-        9.0105 + (Math.random() * 0.01 - 0.005),
-        38.7652 + (Math.random() * 0.01 - 0.005)
-      );
-    }
-  };
-
-  const updateVehicleLocation = async (vehicleId: number, latitude: number, longitude: number) => {
-    try {
-      // Calculate a random speed between 0 and 60 km/h for simulation
-      const speed = Math.floor(Math.random() * 60);
-      
-      await axios.put(
-        // `http://localhost:4000/api/vehicles/${vehicleId}/location`,
-        `${API_URL}/api/vehicles/${vehicleId}/location`,
-        { latitude, longitude, speed },
-        { headers }
-      );
-      
-      toast({
-        title: 'Location Updated',
-        description: 'Vehicle location has been updated successfully.',
-      });
-      
-      refetchVehicle();
-    } catch (error) {
-      console.error('Error updating vehicle location:', error);
-      toast({
-        title: 'Update Error',
-        description: 'Failed to update vehicle location.',
-        variant: 'destructive',
-      });
-    } finally {
+      setStatus('Geolocation not supported');
+      toast({ title: 'Geolocation Not Supported', description: 'Your browser does not support geolocation.', variant: 'destructive' });
       setIsUpdatingLocation(false);
     }
   };
 
-  const updateDriverLocation = async (latitude: number, longitude: number) => {
-    try {
-      await axios.put(
-        // `http://localhost:4000/api/users/${userInfo.id}/location`,
-        `${API_URL}/api/users/${userInfo.id}/location`,
-        { latitude, longitude },
-        { headers }
-      );
-    } catch (error) {
-      console.error('Error updating driver location:', error);
-    }
-  };
-
-  // Request initial location when component mounts
+  // On mount, fetch employees and start periodic location updates
   useEffect(() => {
-    requestLocation();
-    
-    // Set up interval to update location periodically (every 30 seconds)
-    const intervalId = setInterval(() => {
-      requestLocation();
-    }, 30000);
-    
-    // Clean up interval on component unmount
-    return () => clearInterval(intervalId);
+    if (vehicleData?.assigned_employees) {
+      fetchAssignedEmployees(vehicleData.assigned_employees);
+    }
+    getAndSendLocation();
+    const interval = setInterval(getAndSendLocation, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line
   }, [vehicleData?.id]);
 
   return (
@@ -177,7 +147,7 @@ const DriverDashboard: React.FC = () => {
             </div>
             <div className="mt-4 md:mt-0">
               <Button
-                onClick={requestLocation}
+                onClick={getAndSendLocation}
                 disabled={isUpdatingLocation}
               >
                 {isUpdatingLocation ? 'Updating Location...' : 'Update Location'}
@@ -187,13 +157,45 @@ const DriverDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="h-[500px] w-full">
-            <MapComponent 
-              isDriver={true} 
+            <MapComponent
+              isDriver={true}
               driverId={userInfo.id}
               vehicles={vehicleData ? [vehicleData] : []}
+              employeeLocation={undefined}
+              driverLocation={currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : undefined}
             />
           </div>
-          
+          <Card className="mt-4">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Current Location</h3>
+                  <p className="font-medium">{address || 'Fetching address...'}</p>
+                  <h3 className="text-sm font-medium text-muted-foreground">Altitude</h3>
+                  <p className="font-medium">
+                    {currentLocation && currentLocation.altitude !== undefined && currentLocation.altitude !== null
+                      ? `${currentLocation.altitude.toFixed(2)} meters`
+                      : 'N/A'}
+                  </p>
+                  <h3 className="text-sm font-medium text-muted-foreground">Current Speed</h3>
+                  <p className="font-medium">
+                    {currentLocation && currentLocation.speed !== undefined && currentLocation.speed !== null
+                      ? Math.round(currentLocation.speed * 3.6)
+                      : 0} km/h
+                  </p>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Assigned Employees</h3>
+                  <ul>
+                    {assignedEmployees.length > 0 ? assignedEmployees.map((emp) => (
+                      <li key={emp.id}>{emp.name} ({emp.email})</li>
+                    )) : <li>No employees assigned</li>}
+                  </ul>
+                </div>
+              </div>
+              <div className="mt-2 text-muted-foreground">Status: {status}</div>
+            </CardContent>
+          </Card>
           {isLoadingVehicle ? (
             <Card className="mt-4">
               <CardContent className="p-4">
@@ -220,15 +222,11 @@ const DriverDashboard: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Current Speed</h3>
-                    <p className="font-medium">
-                      {vehicleData.location_speed || 0} km/h
-                    </p>
+                    <p className="font-medium">{vehicleData.location_speed || 0} km/h</p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Assigned Employees</h3>
-                    <p className="font-medium">
-                      {vehicleData.assigned_employees?.length || 0} employees
-                    </p>
+                    <p className="font-medium">{vehicleData.assigned_employees?.length || 0} employees</p>
                   </div>
                 </div>
               </CardContent>
