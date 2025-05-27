@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 const API_URL = import.meta.env.VITE_API_URL;
@@ -16,12 +16,21 @@ import MapComponent from './MapComponent';
 
 const DriverDashboard: React.FC = () => {
   const { toast } = useToast();
-  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number; speed?: number | null; altitude?: number | null } | null>(null);
-  const [address, setAddress] = useState<string>('');
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
-  const [assignedEmployees, setAssignedEmployees] = useState<any[]>([]);
-  const [status, setStatus] = useState<string>('Waiting...');
+  const [location, setLocation] = useState<any>(null);
+  const [status, setStatus] = useState("Waiting...");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('auth_token'));
+  const [userRole, setUserRole] = useState("");
+  const [address, setAddress] = useState("");
+  const [altitude, setAltitude] = useState<number | null>(null);
 
+  // Get user info and token from localStorage
   const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
   const token = localStorage.getItem('auth_token');
 
@@ -38,130 +47,153 @@ const DriverDashboard: React.FC = () => {
   } = useQuery({
     queryKey: ['driverVehicle'],
     queryFn: async () => {
-      const response = await axios.get(`${API_URL}/vehicles`, { headers });
-      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id)) || null;
-    },
-  });
-
-  // Fetch assigned employees
-  const fetchAssignedEmployees = async (employeeIds: number[]) => {
-    if (!employeeIds || employeeIds.length === 0) {
-      setAssignedEmployees([]);
-      return;
-    }
-    try {
-      const res = await axios.get(`${API_URL}/users`, { headers });
-      const employees = res.data.filter((u: any) =>
-        employeeIds.map(Number).includes(Number(u.id))
-      );
-      setAssignedEmployees(employees);
-    } catch {
-      setAssignedEmployees([]);
-    }
-  };
-
-  // Update vehicle location
-  const updateVehicleLocation = async (
-    vehicleId: number,
-    latitude: number,
-    longitude: number,
-    speed?: number | null,
-    altitude?: number | null
-  ) => {
-    try {
-      await axios.put(
-        `${API_URL}/vehicles/${vehicleId}/location`,
-        { latitude, longitude, speed, altitude },
+      const response = await axios.get(
+        `${API_URL}/vehicles`,
         { headers }
       );
-      setStatus('Location sent to employees!');
-      toast({
-        title: 'Location Sent',
-        description: `Location sent to employees: (${latitude}, ${longitude})`,
-      });
-      // Console log the location
-      console.log('Driver location sent:', { latitude, longitude, speed, altitude });
-      refetchVehicle();
-    } catch (error: any) {
-      setStatus('Failed to send location');
-      toast({
-        title: 'Update Error',
-        description: 'Failed to update vehicle location.',
-        variant: 'destructive',
-      });
-    }
-    setIsUpdatingLocation(false);
-  };
+      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id));
+    },
+    enabled: !!userInfo.id && !!token,
+  });
 
-  // Get and send location
-  const getAndSendLocation = () => {
-    if (!vehicleData?.id) {
-      setStatus('No assigned vehicle found.');
-      setIsUpdatingLocation(false);
+  // Get and send driver's location
+  const getAndSendLocation = async () => {
+    if (userRole !== "driver") {
+      setStatus("Access denied: Only drivers can send location.");
       return;
     }
     setIsUpdatingLocation(true);
-    setStatus('Getting location...');
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude, speed, altitude } = position.coords;
-          setCurrentLocation({ latitude, longitude, speed: speed ?? null, altitude: altitude ?? null });
-          // Reverse geocode for address
-          try {
-            const geoRes = await axios.get(
-              `https://nominatim.openstreetmap.org/reverse`,
-              {
-                params: {
-                  lat: latitude,
-                  lon: longitude,
-                  format: 'json',
-                },
-              }
-            );
-            setAddress(geoRes.data.display_name || 'Unknown location');
-          } catch {
-            setAddress('Unknown location');
-          }
-          await updateVehicleLocation(
-            vehicleData.id,
-            latitude,
-            longitude,
-            speed ?? null,
-            altitude ?? null
-          );
-        },
-        (error) => {
-          setStatus('Could not get your current location.');
-          toast({
-            title: 'Location Error',
-            description: 'Could not get your current location.',
-            variant: 'destructive',
-          });
-          setIsUpdatingLocation(false);
-        }
-      );
-    } else {
-      setStatus('Geolocation not supported');
-      toast({
-        title: 'Geolocation Not Supported',
-        description: 'Your browser does not support geolocation.',
-        variant: 'destructive',
-      });
+    setStatus("Getting location...");
+
+    if (!navigator.geolocation) {
+      setStatus("Geolocation not supported by your browser.");
       setIsUpdatingLocation(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const coords = pos.coords;
+        setCurrentLocation({ latitude: coords.latitude, longitude: coords.longitude });
+        setLocation(coords);
+        setAltitude(coords.altitude || null);
+
+        // Reverse geocode (optional, using OpenStreetMap)
+        try {
+          const res = await axios.get(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}`
+          );
+          setAddress(res.data.display_name || "Unknown location");
+        } catch {
+          setAddress("Unknown location");
+        }
+
+        setStatus("Sending location...");
+        try {
+          await axios.post(
+            `${API_URL}/locations/car-location`,
+            {
+              location: [coords.latitude, coords.longitude],
+              accuracy: coords.accuracy,
+              speed: coords.speed,
+            },
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          setStatus("Location sent!");
+          refetchVehicle();
+        } catch (e: any) {
+          setStatus(
+            e.response?.data?.error
+              ? `Failed to send location: ${e.response.data.error}`
+              : `Failed to send location: ${e.message}`
+          );
+        }
+        setIsUpdatingLocation(false);
+      },
+      (err) => {
+        console.error("Geolocation error:", err);
+        setStatus("Permission denied or error getting location.");
+        setIsUpdatingLocation(false);
+      }
+    );
+  };
+
+  // Handle login
+  const handleLogin = async () => {
+    setStatus("Logging in...");
+    try {
+      const res = await axios.post(`${API_URL}/auth/login`, {
+        email: username,
+        password,
+      });
+      localStorage.setItem('auth_token', res.data.token);
+      localStorage.setItem('user_info', JSON.stringify(res.data.user));
+      setIsLoggedIn(true);
+      setUserRole(res.data.user?.role || "");
+      setStatus("Login successful!");
+      toast({ title: "Login Successful", description: "Welcome, driver!" });
+    } catch (e: any) {
+      setStatus(
+        e.response?.data?.error
+          ? `Login failed: ${e.response.data.error}`
+          : `Login failed: ${e.message}`
+      );
+      toast({
+        title: "Login Failed",
+        description: e.response?.data?.error || e.message,
+        variant: "destructive",
+      });
     }
   };
 
-  // On mount, fetch employees and start periodic location updates
-  useEffect(() => {
-    if (vehicleData?.assigned_employees) {
-      fetchAssignedEmployees(vehicleData.assigned_employees);
-    }
-    getAndSendLocation();
-    const interval = setInterval(getAndSendLocation, 30000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line
-  }, [vehicleData?.id]);
+  // On mount, set userRole from localStorage
+  React.useEffect(() => {
+    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+    setUserRole(userInfo.role || "");
+  }, [isLoggedIn]);
+
+  // UI
+  if (!isLoggedIn) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Driver Login</CardTitle>
+          <CardDescription>Enter your credentials to access the dashboard.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <Button onClick={handleLogin}>Login</Button>
+          <p>{status}</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (userRole !== "driver") {
+    return (
+      <Card>
+        <CardContent>
+          <p style={{ color: "red", fontWeight: "bold", fontSize: 18 }}>
+            Access denied: Only drivers can use this app.
+          </p>
+          <p>Status: {status}</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -186,45 +218,13 @@ const DriverDashboard: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="h-[500px] w-full">
-            <MapComponent
-              isDriver={true}
+            <MapComponent 
+              isDriver={true} 
               driverId={userInfo.id}
               vehicles={vehicleData ? [vehicleData] : []}
-              employeeLocation={undefined}
-              driverLocation={currentLocation ? { latitude: currentLocation.latitude, longitude: currentLocation.longitude } : undefined}
             />
           </div>
-          <Card className="mt-4">
-            <CardContent className="p-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Current Location</h3>
-                  <p className="font-medium">{address || 'Fetching address...'}</p>
-                  <h3 className="text-sm font-medium text-muted-foreground">Altitude</h3>
-                  <p className="font-medium">
-                    {currentLocation && currentLocation.altitude !== undefined && currentLocation.altitude !== null
-                      ? `${currentLocation.altitude.toFixed(2)} meters`
-                      : 'N/A'}
-                  </p>
-                  <h3 className="text-sm font-medium text-muted-foreground">Current Speed</h3>
-                  <p className="font-medium">
-                    {currentLocation && currentLocation.speed !== undefined && currentLocation.speed !== null
-                      ? Math.round(currentLocation.speed * 3.6)
-                      : 0} km/h
-                  </p>
-                </div>
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">Assigned Employees</h3>
-                  <ul>
-                    {assignedEmployees.length > 0 ? assignedEmployees.map((emp) => (
-                      <li key={emp.id}>{emp.name} ({emp.email})</li>
-                    )) : <li>No employees assigned</li>}
-                  </ul>
-                </div>
-              </div>
-              <div className="mt-2 text-muted-foreground">Status: {status}</div>
-            </CardContent>
-          </Card>
+          
           {isLoadingVehicle ? (
             <Card className="mt-4">
               <CardContent className="p-4">
@@ -251,11 +251,15 @@ const DriverDashboard: React.FC = () => {
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Current Speed</h3>
-                    <p className="font-medium">{vehicleData.location_speed || 0} km/h</p>
+                    <p className="font-medium">
+                      {vehicleData.location_speed || 0} km/h
+                    </p>
                   </div>
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Assigned Employees</h3>
-                    <p className="font-medium">{vehicleData.assigned_employees?.length || 0} employees</p>
+                    <p className="font-medium">
+                      {vehicleData.assigned_employees?.length || 0} employees
+                    </p>
                   </div>
                 </div>
               </CardContent>
