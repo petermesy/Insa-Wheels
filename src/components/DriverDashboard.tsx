@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import {
   Card,
@@ -86,18 +85,16 @@ const DriverDashboard: React.FC = () => {
     }
   };
 
-  // Fetch assigned vehicle info
+  // Fetch assigned vehicle info and employees
   const fetchVehicleData = async () => {
     setIsLoadingVehicle(true);
     try {
-      const res = await axios.get(`${API_URL}/vehicles`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const userRes = await axios.get(`${API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const userId = userRes.data.user?.id;
-      const vehicle = res.data.find((v: any) => v.driver_id === userId);
+      const vehiclesRes = await axios.get(`${API_URL}/vehicles`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
+const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+const userId = userInfo.id;
+const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
       setVehicleData(vehicle || null);
 
       if (vehicle && vehicle.assigned_employees) {
@@ -181,7 +178,7 @@ const DriverDashboard: React.FC = () => {
         setLocation({ latitude, longitude, altitude, accuracy, speed });
         setAltitude(altitude ?? null);
 
-        // Reverse geocode for address (using Nominatim as in original DriverDashboard)
+        // Reverse geocode for address (using Nominatim)
         try {
           const geoRes = await axios.get(
             `https://nominatim.openstreetmap.org/reverse`,
@@ -221,10 +218,11 @@ const DriverDashboard: React.FC = () => {
       const interval = setInterval(getAndSendLocation, 30000); // Update every 30 seconds
       return () => clearInterval(interval);
     }
+    // eslint-disable-next-line
   }, [isLoggedIn, token, userRole]);
 
   // UI
- if (!isLoggedIn) {
+  if (!isLoggedIn) {
     return (
       <Card className="max-w-md mx-auto mt-16">
         <CardHeader>
