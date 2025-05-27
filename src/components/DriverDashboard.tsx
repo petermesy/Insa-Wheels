@@ -1,126 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-const API_URL = import.meta.env.VITE_API_URL;
-
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import MapComponent from './MapComponent';
 
+const API_URL = import.meta.env.VITE_API_URL;
+const BACKEND_URL = `${API_URL}/locations`;
+
 const DriverDashboard: React.FC = () => {
   const { toast } = useToast();
-  const [currentLocation, setCurrentLocation] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const [location, setLocation] = useState<any>(null);
   const [status, setStatus] = useState("Waiting...");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem('auth_token'));
+  const [token, setToken] = useState(localStorage.getItem('auth_token') || "");
+  const [isLoggedIn, setIsLoggedIn] = useState(!!token);
   const [userRole, setUserRole] = useState("");
+  const [vehicleData, setVehicleData] = useState<any>(null);
+  const [isLoadingVehicle, setIsLoadingVehicle] = useState(false);
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
+  const [assignedEmployees, setAssignedEmployees] = useState<any[]>([]);
   const [address, setAddress] = useState("");
   const [altitude, setAltitude] = useState<number | null>(null);
 
-  // Get user info and token from localStorage
-  const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-  const token = localStorage.getItem('auth_token');
+  // Fetch user info from localStorage
+  useEffect(() => {
+    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+    setUsername(userInfo.email || "");
+    setUserRole(userInfo.role || "");
+  }, []);
 
-  const headers = {
-    Authorization: `Bearer ${token}`,
-  };
-
-  // Fetch driver's assigned vehicle
-  const {
-    data: vehicleData,
-    isLoading: isLoadingVehicle,
-    error: vehicleError,
-    refetch: refetchVehicle,
-  } = useQuery({
-    queryKey: ['driverVehicle'],
-    queryFn: async () => {
-      const response = await axios.get(
-        `${API_URL}/vehicles`,
-        { headers }
-      );
-      return response.data.find((v: any) => v.driver_id === parseInt(userInfo.id));
-    },
-    enabled: !!userInfo.id && !!token,
-  });
-
-  // Get and send driver's location
-  const getAndSendLocation = async () => {
-    if (userRole !== "driver") {
-      setStatus("Access denied: Only drivers can send location.");
-      return;
-    }
-    setIsUpdatingLocation(true);
-    setStatus("Getting location...");
-
-    if (!navigator.geolocation) {
-      setStatus("Geolocation not supported by your browser.");
-      setIsUpdatingLocation(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const coords = pos.coords;
-        setCurrentLocation({ latitude: coords.latitude, longitude: coords.longitude });
-        setLocation(coords);
-        setAltitude(coords.altitude || null);
-
-        // Reverse geocode (optional, using OpenStreetMap)
-        try {
-          const res = await axios.get(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}`
-          );
-          setAddress(res.data.display_name || "Unknown location");
-        } catch {
-          setAddress("Unknown location");
-        }
-
-        setStatus("Sending location...");
-        try {
-          await axios.post(
-            `${API_URL}/locations/car-location`,
-            {
-              location: [coords.latitude, coords.longitude],
-              accuracy: coords.accuracy,
-              speed: coords.speed,
-            },
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-          setStatus("Location sent!");
-          refetchVehicle();
-        } catch (e: any) {
-          setStatus(
-            e.response?.data?.error
-              ? `Failed to send location: ${e.response.data.error}`
-              : `Failed to send location: ${e.message}`
-          );
-        }
-        setIsUpdatingLocation(false);
-      },
-      (err) => {
-        console.error("Geolocation error:", err);
-        setStatus("Permission denied or error getting location.");
-        setIsUpdatingLocation(false);
-      }
-    );
-  };
-
-  // Handle login
+  // Login handler
   const handleLogin = async () => {
     setStatus("Logging in...");
     try {
@@ -128,10 +46,11 @@ const DriverDashboard: React.FC = () => {
         email: username,
         password,
       });
+      setToken(res.data.token);
+      setUserRole(res.data.user?.role || "");
       localStorage.setItem('auth_token', res.data.token);
       localStorage.setItem('user_info', JSON.stringify(res.data.user));
       setIsLoggedIn(true);
-      setUserRole(res.data.user?.role || "");
       setStatus("Login successful!");
       toast({ title: "Login Successful", description: "Welcome, driver!" });
     } catch (e: any) {
@@ -148,16 +67,166 @@ const DriverDashboard: React.FC = () => {
     }
   };
 
-  // On mount, set userRole from localStorage
-  React.useEffect(() => {
-    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-    setUserRole(userInfo.role || "");
-  }, [isLoggedIn]);
+  // Fetch assigned employees
+  const fetchAssignedEmployees = async (employeeIds: number[]) => {
+    if (!employeeIds || employeeIds.length === 0) {
+      setAssignedEmployees([]);
+      return;
+    }
+    try {
+      const res = await axios.get(`${API_URL}/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const employees = res.data.filter((u: any) =>
+        employeeIds.map(Number).includes(Number(u.id))
+      );
+      setAssignedEmployees(employees);
+    } catch {
+      setAssignedEmployees([]);
+    }
+  };
+
+  // Fetch assigned vehicle info
+  const fetchVehicleData = async () => {
+    setIsLoadingVehicle(true);
+    try {
+      const res = await axios.get(`${API_URL}/vehicles`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const userRes = await axios.get(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const userId = userRes.data.user?.id;
+      const vehicle = res.data.find((v: any) => v.driver_id === userId);
+      setVehicleData(vehicle || null);
+
+      if (vehicle && vehicle.assigned_employees) {
+        fetchAssignedEmployees(vehicle.assigned_employees);
+      } else {
+        setAssignedEmployees([]);
+      }
+    } catch {
+      setVehicleData(null);
+      setAssignedEmployees([]);
+    }
+    setIsLoadingVehicle(false);
+  };
+
+  // Send location to backend
+  const sendLocationToBackend = async (
+    latitude: number,
+    longitude: number,
+    accuracy: number | null,
+    speed: number | null,
+    altitude: number | null
+  ) => {
+    setStatus("Sending location...");
+    try {
+      await axios.post(
+        `${BACKEND_URL}/car-location`,
+        {
+          location: [latitude, longitude],
+          accuracy,
+          speed,
+          altitude,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setStatus("Location sent to employees!");
+      toast({
+        title: "Location Sent",
+        description: `Location sent: (${latitude.toFixed(6)}, ${longitude.toFixed(6)})`,
+      });
+      fetchVehicleData();
+    } catch (e: any) {
+      setStatus(
+        e.response?.data?.error
+          ? `Failed to send location: ${e.response.data.error}`
+          : `Failed to send location: ${e.message}`
+      );
+      toast({
+        title: "Send Failed",
+        description: e.response?.data?.error || e.message,
+        variant: "destructive",
+      });
+    }
+    setIsUpdatingLocation(false);
+  };
+
+  // Get and send location (aligned with React Native logic)
+  const getAndSendLocation = async () => {
+    if (userRole !== "driver") {
+      setStatus("Access denied: Only drivers can send location.");
+      return;
+    }
+    setIsUpdatingLocation(true);
+    setStatus("Requesting location...");
+
+    if (!navigator.geolocation) {
+      setStatus("Geolocation not supported by your browser.");
+      setIsUpdatingLocation(false);
+      toast({
+        title: "Geolocation Error",
+        description: "Geolocation is not supported by your browser.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude, altitude, accuracy, speed } = pos.coords;
+        setLocation({ latitude, longitude, altitude, accuracy, speed });
+        setAltitude(altitude ?? null);
+
+        // Reverse geocode for address (using Nominatim as in original DriverDashboard)
+        try {
+          const geoRes = await axios.get(
+            `https://nominatim.openstreetmap.org/reverse`,
+            {
+              params: {
+                lat: latitude,
+                lon: longitude,
+                format: "json",
+              },
+            }
+          );
+          setAddress(geoRes.data.display_name || "Unknown location");
+        } catch {
+          setAddress("Unknown location");
+        }
+
+        await sendLocationToBackend(latitude, longitude, accuracy ?? null, speed ?? null, altitude ?? null);
+      },
+      (err) => {
+        setStatus("Permission denied or error getting location.");
+        setIsUpdatingLocation(false);
+        toast({
+          title: "Location Error",
+          description: "Could not get your current location: " + err.message,
+          variant: "destructive",
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // On login, fetch vehicle and start location updates
+  useEffect(() => {
+    if (isLoggedIn && userRole === "driver") {
+      fetchVehicleData();
+      getAndSendLocation();
+      const interval = setInterval(getAndSendLocation, 30000); // Update every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [isLoggedIn, token, userRole]);
 
   // UI
-  if (!isLoggedIn) {
+ if (!isLoggedIn) {
     return (
-      <Card>
+      <Card className="max-w-md mx-auto mt-16">
         <CardHeader>
           <CardTitle>Driver Login</CardTitle>
           <CardDescription>Enter your credentials to access the dashboard.</CardDescription>
@@ -168,15 +237,17 @@ const DriverDashboard: React.FC = () => {
             placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            className="mb-2 p-2 w-full rounded border border-gray-300"
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            className="mb-2 p-2 w-full rounded border border-gray-300"
           />
-          <Button onClick={handleLogin}>Login</Button>
-          <p>{status}</p>
+          <Button onClick={handleLogin} className="w-full">Login</Button>
+          <p className="mt-2 text-sm text-gray-500">{status}</p>
         </CardContent>
       </Card>
     );
@@ -184,7 +255,7 @@ const DriverDashboard: React.FC = () => {
 
   if (userRole !== "driver") {
     return (
-      <Card>
+      <Card className="max-w-md mx-auto mt-16">
         <CardContent>
           <p style={{ color: "red", fontWeight: "bold", fontSize: 18 }}>
             Access denied: Only drivers can use this app.
@@ -196,81 +267,100 @@ const DriverDashboard: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="container mx-auto py-8 space-y-6">
       <Card>
-        <CardHeader>
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between">
-            <div>
-              <CardTitle className="text-2xl">Driver Dashboard</CardTitle>
-              <CardDescription>
-                Share your location with assigned employees
-              </CardDescription>
-            </div>
-            <div className="mt-4 md:mt-0">
-              <Button
-                onClick={getAndSendLocation}
-                disabled={isUpdatingLocation}
-              >
-                {isUpdatingLocation ? 'Updating Location...' : 'Update Location'}
-              </Button>
-            </div>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-2xl">Driver Dashboard</CardTitle>
+            <CardDescription>Share your location with assigned employees</CardDescription>
           </div>
+          <Button onClick={getAndSendLocation} disabled={isUpdatingLocation}>
+            {isUpdatingLocation ? "Updating..." : "Update Location"}
+          </Button>
         </CardHeader>
         <CardContent>
-          <div className="h-[500px] w-full">
-            <MapComponent 
-              isDriver={true} 
-              driverId={userInfo.id}
-              vehicles={vehicleData ? [vehicleData] : []}
-            />
+          <div className="rounded-lg overflow-hidden border mb-6" style={{ height: 400 }}>
+            {location && (
+              <MapComponent
+                latitude={location.latitude}
+                longitude={location.longitude}
+                altitude={altitude}
+                address={address}
+              />
+            )}
           </div>
-          
-          {isLoadingVehicle ? (
-            <Card className="mt-4">
-              <CardContent className="p-4">
-                <p>Loading vehicle information...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Sharing Status */}
+            <Card className="shadow-none border">
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold">Sharing Location</div>
+                    <div className="text-sm text-muted-foreground">
+                      Your location is being shared with assigned employees
+                    </div>
+                  </div>
+                  <span className="flex items-center">
+                    <span className="h-3 w-3 rounded-full bg-green-500 mr-2"></span>
+                    <span className="text-green-700 font-medium">Live</span>
+                  </span>
+                </div>
               </CardContent>
             </Card>
-          ) : vehicleError ? (
-            <Card className="mt-4">
-              <CardContent className="p-4">
-                <p className="text-destructive">Error loading vehicle information</p>
-              </CardContent>
-            </Card>
-          ) : vehicleData ? (
-            <Card className="mt-4">
-              <CardContent className="p-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Vehicle Info */}
+            <Card className="shadow-none border">
+              <CardContent className="py-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Vehicle Type</h3>
-                    <p className="font-medium">{vehicleData.type}</p>
+                    <div className="text-xs text-muted-foreground">Vehicle Type</div>
+                    <div className="font-semibold">{vehicleData?.type || "N/A"}</div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">License Plate</h3>
-                    <p className="font-medium">{vehicleData.license_plate}</p>
+                    <div className="text-xs text-muted-foreground">License Plate</div>
+                    <div className="font-semibold">{vehicleData?.license_plate || "N/A"}</div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Current Speed</h3>
-                    <p className="font-medium">
-                      {vehicleData.location_speed || 0} km/h
-                    </p>
+                    <div className="text-xs text-muted-foreground">Current Speed</div>
+                    <div className="font-semibold">
+                      {location?.speed ? `${Math.round(location.speed * 3.6)} km/h` : "0 km/h"}
+                    </div>
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Assigned Employees</h3>
-                    <p className="font-medium">
-                      {vehicleData.assigned_employees?.length || 0} employees
-                    </p>
+                    <div className="text-xs text-muted-foreground">Assigned Employees</div>
+                    <div className="font-semibold">
+                      {assignedEmployees.length} {assignedEmployees.length === 1 ? "employee" : "employees"}
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-          ) : (
-            <Card className="mt-4">
-              <CardContent className="p-4">
-                <p className="text-amber-500">No vehicle is assigned to you yet.</p>
+          </div>
+          {/* Details */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="shadow-none border">
+              <CardContent className="py-4">
+                <div className="font-semibold mb-2">Assigned Employees</div>
+                <ul className="list-disc ml-5">
+                  {assignedEmployees.length > 0 ? (
+                    assignedEmployees.map((emp) => (
+                      <li key={emp.id}>{emp.name} ({emp.email})</li>
+                    ))
+                  ) : (
+                    <li>No employees assigned</li>
+                  )}
+                </ul>
               </CardContent>
             </Card>
-          )}
+            <Card className="shadow-none border">
+              <CardContent className="py-4">
+                <div className="font-semibold mb-2">Current Location</div>
+                <div className="text-sm">Address: {address || "Fetching address..."}</div>
+                <div className="text-sm">Altitude: {altitude !== null ? `${altitude.toFixed(2)} meters` : "N/A"}</div>
+                <div className="text-sm">Speed: {location?.speed ? `${Math.round(location.speed * 3.6)} km/h` : "N/A"}</div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="mt-4 text-sm text-muted-foreground">{status}</div>
         </CardContent>
       </Card>
     </div>
