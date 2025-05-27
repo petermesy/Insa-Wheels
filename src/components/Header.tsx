@@ -42,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({ userType, onLogout }) => {
                   <Button variant="ghost" size="sm">Track Vehicles</Button>
                 </Link>
               )}
-              <Button variant="outline" size="sm" onClick={onLogout}>
+              <Button variant="secondary" size="sm" onClick={onLogout}>
                 Logout
               </Button>
             </>
