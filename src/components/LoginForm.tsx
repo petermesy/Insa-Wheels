@@ -138,16 +138,7 @@ const LoginForm: React.FC = () => {
           </form>
         </Form>
       </CardContent>
-      <CardFooter className="flex flex-col items-center">
-        <div className="text-sm text-muted-foreground">
-          <span>Test accounts:</span>
-          <ul className="mt-1 list-disc pl-5">
-            <li>admin@insa.com / password</li>
-            <li>driver@insa.com / password</li>
-            <li>employee@insa.com / password</li>
-          </ul>
-        </div>
-      </CardFooter>
+
     </Card>
   );
 };
