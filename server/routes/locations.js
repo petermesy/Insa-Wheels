@@ -27,25 +27,36 @@ router.post('/car-location', async (req, res) => {
       timestamp: new Date()
     };
 
-    // Find the vehicle for this driver
-    const vehicleRes = await db.query(
-      `SELECT id, 
-              ARRAY(
-                SELECT ve.employee_id 
-                FROM vehicle_employees ve 
-                WHERE ve.vehicle_id = v.id
-              ) as assigned_employees 
-         FROM vehicles v 
-         WHERE driver_id = $1`,
-      [driverId]
-    );
-    const vehicle = vehicleRes.rows[0];
+    // // Find the vehicle for this driver
+    // const vehicleRes = await db.query(
+    //   `SELECT id, 
+    //           ARRAY(
+    //             SELECT ve.employee_id 
+    //             FROM vehicle_employees ve 
+    //             WHERE ve.vehicle_id = v.id
+    //           ) as assigned_employees 
+    //      FROM vehicles v 
+    //      WHERE driver_id = $1`,
+    //   [driverId]
+    // );
+    // const vehicle = vehicleRes.rows[0];
 
-    if (vehicle && vehicle.assigned_employees) {
-      for (const employeeId of vehicle.assigned_employees) {
-        io.to(`employee_${employeeId}`).emit('carLocationUpdate', locationData);
-      }
-    }
+    // if (vehicle && vehicle.assigned_employees) {
+    //   for (const employeeId of vehicle.assigned_employees) {
+    //     io.to(`employee_${employeeId}`).emit('carLocationUpdate', locationData);
+    //   }
+    // }
+    const vehicleRes = await db.query(
+  `SELECT id, assigned_employees FROM vehicles WHERE driver_id = $1`,
+  [driverId]
+);
+const vehicle = vehicleRes.rows[0];
+
+if (vehicle && Array.isArray(vehicle.assigned_employees)) {
+  for (const employeeId of vehicle.assigned_employees) {
+    io.to(`employee_${employeeId}`).emit('carLocationUpdate', locationData);
+  }
+}
 
     console.log('Location update received and sent to employees:', locationData);
     res.status(200).json({ success: true });
