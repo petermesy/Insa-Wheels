@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import { io, Socket } from 'socket.io-client';
 import {
   Card,
   CardContent,
@@ -16,7 +17,7 @@ const BACKEND_URL = `${API_URL}/locations`;
 
 const DriverDashboard: React.FC = () => {
   const { toast } = useToast();
-  const [location, setLocation] = useState<any>(null);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number; accuracy?: number; speed?: number; altitude?: number } | null>(null);
   const [status, setStatus] = useState("Waiting...");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -27,12 +28,13 @@ const DriverDashboard: React.FC = () => {
   const [isLoadingVehicle, setIsLoadingVehicle] = useState(false);
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false);
   const [assignedEmployees, setAssignedEmployees] = useState<any[]>([]);
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState("Loading...");
   const [altitude, setAltitude] = useState<number | null>(null);
 
   // Fetch user info from localStorage
   useEffect(() => {
     const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+    console.log('User Info:', userInfo); // Debug: Log user info
     setUsername(userInfo.email || "");
     setUserRole(userInfo.role || "");
   }, []);
@@ -68,7 +70,9 @@ const DriverDashboard: React.FC = () => {
 
   // Fetch assigned employees
   const fetchAssignedEmployees = async (employeeIds: number[]) => {
+    console.log('Fetching employees with IDs:', employeeIds); // Debug: Log employee IDs
     if (!employeeIds || employeeIds.length === 0) {
+      console.log('No employee IDs provided');
       setAssignedEmployees([]);
       return;
     }
@@ -76,12 +80,27 @@ const DriverDashboard: React.FC = () => {
       const res = await axios.get(`${API_URL}/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      console.log('Users fetched:', res.data); // Debug: Log all users
       const employees = res.data.filter((u: any) =>
         employeeIds.map(Number).includes(Number(u.id))
       );
+      console.log('Filtered employees:', employees); // Debug: Log filtered employees
       setAssignedEmployees(employees);
-    } catch {
+      if (employees.length === 0) {
+        toast({
+          title: "No Employees Found",
+          description: "No employees match the assigned IDs.",
+          variant: "warning",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching employees:", error);
       setAssignedEmployees([]);
+      toast({
+        title: "Error",
+        description: "Failed to fetch assigned employees.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -89,22 +108,39 @@ const DriverDashboard: React.FC = () => {
   const fetchVehicleData = async () => {
     setIsLoadingVehicle(true);
     try {
+      const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+      console.log('Fetching vehicle for user ID:', userInfo.id); // Debug: Log user ID
       const vehiclesRes = await axios.get(`${API_URL}/vehicles`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
-const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-const userId = userInfo.id;
-const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      console.log('Vehicles fetched:', vehiclesRes.data); // Debug: Log all vehicles
+      const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === Number(userInfo.id));
+      console.log('Assigned vehicle:', vehicle); // Debug: Log found vehicle
       setVehicleData(vehicle || null);
 
       if (vehicle && vehicle.assigned_employees) {
-        fetchAssignedEmployees(vehicle.assigned_employees);
+        console.log('Assigned employee IDs:', vehicle.assigned_employees); // Debug: Log employee IDs
+        await fetchAssignedEmployees(vehicle.assigned_employees);
       } else {
+        console.log('No vehicle or no assigned employees');
         setAssignedEmployees([]);
+        if (!vehicle) {
+          toast({
+            title: "No Vehicle Assigned",
+            description: "You are not assigned to any vehicle.",
+            variant: "warning",
+          });
+        }
       }
-    } catch {
+    } catch (error) {
+      console.error("Error fetching vehicle data:", error);
       setVehicleData(null);
       setAssignedEmployees([]);
+      toast({
+        title: "Error",
+        description: "Failed to fetch vehicle information.",
+        variant: "destructive",
+      });
     }
     setIsLoadingVehicle(false);
   };
@@ -136,7 +172,7 @@ const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
         title: "Location Sent",
         description: `Location sent: (${latitude.toFixed(6)}, ${longitude.toFixed(6)})`,
       });
-      fetchVehicleData();
+      fetchVehicleData(); // Refresh vehicle data after location update
     } catch (e: any) {
       setStatus(
         e.response?.data?.error
@@ -152,7 +188,7 @@ const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
     setIsUpdatingLocation(false);
   };
 
-  // Get and send location (aligned with React Native logic)
+  // Get and send location
   const getAndSendLocation = async () => {
     if (userRole !== "driver") {
       setStatus("Access denied: Only drivers can send location.");
@@ -178,7 +214,6 @@ const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
         setLocation({ latitude, longitude, altitude, accuracy, speed });
         setAltitude(altitude ?? null);
 
-        // Reverse geocode for address (using Nominatim)
         try {
           const geoRes = await axios.get(
             `https://nominatim.openstreetmap.org/reverse`,
@@ -210,7 +245,7 @@ const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
     );
   };
 
-  // On login, fetch vehicle and start location updates
+  // Fetch vehicle and employees on login
   useEffect(() => {
     if (isLoggedIn && userRole === "driver") {
       fetchVehicleData();
@@ -220,6 +255,16 @@ const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
     }
     // eslint-disable-next-line
   }, [isLoggedIn, token, userRole]);
+
+  // Enhanced vehicle data with memoization
+  const enhancedVehicle = useMemo(() => {
+    if (!vehicleData) return null;
+    return {
+      ...vehicleData,
+      driverId: vehicleData.driver_id,
+      assignedEmployees: vehicleData.assigned_employees || [],
+    };
+  }, [vehicleData]);
 
   // UI
   if (!isLoggedIn) {
@@ -280,84 +325,97 @@ const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === userId);
           <div className="rounded-lg overflow-hidden border mb-6" style={{ height: 400 }}>
             {location && (
               <MapComponent
-                latitude={location.latitude}
-                longitude={location.longitude}
-                altitude={altitude}
-                address={address}
+                vehicles={enhancedVehicle ? [enhancedVehicle] : []}
+                driverLocation={location}
               />
             )}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Sharing Status */}
-            <Card className="shadow-none border">
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-semibold">Sharing Location</div>
-                    <div className="text-sm text-muted-foreground">
-                      Your location is being shared with assigned employees
+          {isLoadingVehicle ? (
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <p>Loading vehicle information...</p>
+              </CardContent>
+            </Card>
+          ) : !enhancedVehicle ? (
+            <Card className="mt-4">
+              <CardContent className="p-4">
+                <p className="text-amber-500">You are not assigned to any vehicle yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="shadow-none border">
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="font-semibold">Sharing Location</div>
+                        <div className="text-sm text-muted-foreground">
+                          Your location is being shared with assigned employees
+                        </div>
+                      </div>
+                      <span className="flex items-center">
+                        <span className="h-3 w-3 rounded-full bg-green-500 mr-2"></span>
+                        <span className="text-green-700 font-medium">Live</span>
+                      </span>
                     </div>
-                  </div>
-                  <span className="flex items-center">
-                    <span className="h-3 w-3 rounded-full bg-green-500 mr-2"></span>
-                    <span className="text-green-700 font-medium">Live</span>
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-            {/* Vehicle Info */}
-            <Card className="shadow-none border">
-              <CardContent className="py-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Vehicle Type</div>
-                    <div className="font-semibold">{vehicleData?.type || "N/A"}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">License Plate</div>
-                    <div className="font-semibold">{vehicleData?.license_plate || "N/A"}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Current Speed</div>
-                    <div className="font-semibold">
-                      {location?.speed ? `${Math.round(location.speed * 3.6)} km/h` : "0 km/h"}
+                  </CardContent>
+                </Card>
+                <Card className="shadow-none border">
+                  <CardContent className="py-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Vehicle Type</div>
+                        <div className="font-semibold">{enhancedVehicle?.type || "N/A"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">License Plate</div>
+                        <div className="font-semibold">{enhancedVehicle?.license_plate || "N/A"}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Current Speed</div>
+                        <div className="font-semibold">
+                          {location?.speed ? `${Math.round(location.speed * 3.6)} km/h` : "0 km/h"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Assigned Employees</div>
+                        <div className="font-semibold">
+                          {assignedEmployees.length} {assignedEmployees.length === 1 ? "employee" : "employees"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Assigned Employees</div>
-                    <div className="font-semibold">
-                      {assignedEmployees.length} {assignedEmployees.length === 1 ? "employee" : "employees"}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          {/* Details */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="shadow-none border">
-              <CardContent className="py-4">
-                <div className="font-semibold mb-2">Assigned Employees</div>
-                <ul className="list-disc ml-5">
-                  {assignedEmployees.length > 0 ? (
-                    assignedEmployees.map((emp) => (
-                      <li key={emp.id}>{emp.name} ({emp.email})</li>
-                    ))
-                  ) : (
-                    <li>No employees assigned</li>
-                  )}
-                </ul>
-              </CardContent>
-            </Card>
-            <Card className="shadow-none border">
-              <CardContent className="py-4">
-                <div className="font-semibold mb-2">Current Location</div>
-                <div className="text-sm">Address: {address || "Fetching address..."}</div>
-                <div className="text-sm">Altitude: {altitude !== null ? `${altitude.toFixed(2)} meters` : "N/A"}</div>
-                <div className="text-sm">Speed: {location?.speed ? `${Math.round(location.speed * 3.6)} km/h` : "N/A"}</div>
-              </CardContent>
-            </Card>
-          </div>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="shadow-none border">
+                  <CardContent className="py-4">
+                    <div className="font-semibold mb-2">Assigned Employees</div>
+                    <ul className="list-disc ml-5">
+                      {assignedEmployees.length > 0 ? (
+                        assignedEmployees.map((emp) => (
+                          <li key={emp.id}>
+                            {emp.name} ({emp.email})
+                          </li>
+                        ))
+                      ) : (
+                        <li>No employees assigned</li>
+                      )}
+                    </ul>
+                  </CardContent>
+                </Card>
+                <Card className="shadow-none border">
+                  <CardContent className="py-4">
+                    <div className="font-semibold mb-2">Current Location</div>
+                    <div className="text-sm">Address: {address || "Fetching address..."}</div>
+                    <div className="text-sm">Altitude: {altitude !== null ? `${altitude.toFixed(2)} meters` : "N/A"}</div>
+                    <div className="text-sm">Speed: {location?.speed ? `${Math.round(location.speed * 3.6)} km/h` : "N/A"}</div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
           <div className="mt-4 text-sm text-muted-foreground">{status}</div>
         </CardContent>
       </Card>

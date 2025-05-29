@@ -10,10 +10,7 @@ const {
 const validator = require('validator');
 
 // Validate license plate (basic example, adjust regex as needed)
-const isValidLicensePlate = (licensePlate) => /^[A-Z0-9-]{3,10}$/.test(licensePlate);
-
-// Validate vehicle type
-const isValidVehicleType = (type) => ['bus', 'truck', 'van', 'car'].includes(type.toLowerCase());
+const isValidLicensePlate = (licensePlate) => /^[A-Z0-9-]{3,10}$/i.test(licensePlate);
 
 const getAllVehicles = async (req, res) => {
   try {
@@ -31,10 +28,9 @@ const getAllVehicles = async (req, res) => {
 const getVehicleById = async (req, res) => {
   const { id } = req.params;
 
-  if (!validator.isInt(id)) {
+  if (!validator.isInt(String(id))) {
     return res.status(400).json({ error: 'Invalid vehicle ID format' });
   }
-
   try {
     const vehicle = await findVehicleById(id);
     if (!vehicle) {
@@ -58,15 +54,11 @@ const createVehicle = async (req, res) => {
     return res.status(400).json({ error: 'Type, license plate, destination, and driver ID are required' });
   }
 
-  if (!isValidVehicleType(type)) {
-    return res.status(400).json({ error: 'Invalid vehicle type. Must be bus, truck, van, or car' });
-  }
-
   if (!isValidLicensePlate(licensePlate)) {
     return res.status(400).json({ error: 'Invalid license plate format' });
   }
 
-  if (!validator.isInt(driverId)) {
+  if (!validator.isInt(String(driverId))) {
     return res.status(400).json({ error: 'Invalid driver ID format' });
   }
 
@@ -94,7 +86,7 @@ const updateVehicle = async (req, res) => {
   const { id } = req.params;
   const { type, licensePlate, destination, driverId } = req.body;
 
-  if (!validator.isInt(id)) {
+  if (!validator.isInt(String(id))) {
     return res.status(400).json({ error: 'Invalid vehicle ID format' });
   }
 
@@ -102,15 +94,11 @@ const updateVehicle = async (req, res) => {
     return res.status(400).json({ error: 'Type, license plate, destination, and driver ID are required' });
   }
 
-  if (!isValidVehicleType(type)) {
-    return res.status(400).json({ error: 'Invalid vehicle type. Must be bus, truck, van, or car' });
-  }
-
   if (!isValidLicensePlate(licensePlate)) {
     return res.status(400).json({ error: 'Invalid license plate format' });
   }
 
-  if (!validator.isInt(driverId)) {
+  if (!validator.isInt(String(driverId))) {
     return res.status(400).json({ error: 'Invalid driver ID format' });
   }
 
@@ -141,7 +129,7 @@ const updateVehicle = async (req, res) => {
 const deleteVehicle = async (req, res) => {
   const { id } = req.params;
 
-  if (!validator.isInt(id)) {
+  if (!validator.isInt(String(id))) {
     return res.status(400).json({ error: 'Invalid vehicle ID format' });
   }
 
@@ -170,11 +158,16 @@ const updateVehicleLocation = async (req, res) => {
   const { id } = req.params;
   const { latitude, longitude, speed } = req.body;
 
-  if (!validator.isInt(id)) {
+  if (!validator.isInt(String(id))) {
     return res.status(400).json({ error: 'Invalid vehicle ID format' });
   }
 
-  if (!latitude || !longitude || !validator.isFloat(latitude.toString()) || !validator.isFloat(longitude.toString())) {
+  if (
+    latitude === undefined ||
+    longitude === undefined ||
+    !validator.isFloat(String(latitude)) ||
+    !validator.isFloat(String(longitude))
+  ) {
     return res.status(400).json({ error: 'Valid latitude and longitude are required' });
   }
 
@@ -198,11 +191,11 @@ const assignEmployeeToVehicle = async (req, res) => {
   const { id } = req.params;
   const { employeeId } = req.body;
 
-  if (!validator.isInt(id)) {
+  if (!validator.isInt(String(id))) {
     return res.status(400).json({ error: 'Invalid vehicle ID format' });
   }
 
-  if (!employeeId || !validator.isInt(employeeId)) {
+  if (!employeeId || !validator.isInt(String(employeeId))) {
     return res.status(400).json({ error: 'Valid employee ID is required' });
   }
 

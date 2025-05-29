@@ -58,13 +58,15 @@ const updateVehicleLocationById = async (id, { latitude, longitude, speed }) => 
 
 // Assign employee to vehicle by ID (assumes assigned_employees is an integer array)
 const assignEmployeeToVehicleById = async (vehicleId, employeeId) => {
-  // Add employeeId to assigned_employees array if not already present
+  // Ensure employeeId is an integer
+  const empId = Number(employeeId);
+  const vehId = Number(vehicleId);
   const result = await db.query(
     `UPDATE vehicles
      SET assigned_employees = array_append(assigned_employees, $1)
-     WHERE id = $2 AND NOT (assigned_employees @> ARRAY[$1])
+     WHERE id = $2 AND NOT (assigned_employees @> ARRAY[$1]::integer[])
      RETURNING *`,
-    [employeeId, vehicleId]
+    [empId, vehId]
   );
   return result.rows[0];
 };
