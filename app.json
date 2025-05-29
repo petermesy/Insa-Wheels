@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "75b97b26-9e18-4192-82db-04920c4cd1be"
+      }
+    },
+    "android": {
+      "package": "com.petermesy.insawheels"
+    }
+  }
+}

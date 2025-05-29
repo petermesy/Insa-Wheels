@@ -65,19 +65,27 @@ const updateUserById = async (id, userData) => {
   return result.rows[0];
 };
 
+// const deleteUserById = async (id) => {
+//   // Check if user exists
+//   const user = await getUserById(id);
+//   if (!user) {
+//     throw new Error('User not found');
+//   }
+  
+//   // Delete the user
+//   await db.query('DELETE FROM users WHERE id = $1', [id]);
+  
+//   return true;
+// };
 const deleteUserById = async (id) => {
   // Check if user exists
   const user = await getUserById(id);
   if (!user) {
-    throw new Error('User not found');
+    return null;
   }
-  
-  // Delete the user
   await db.query('DELETE FROM users WHERE id = $1', [id]);
-  
   return true;
 };
-
 const updateUserLocationById = async (id, locationData) => {
   const { latitude, longitude } = locationData;
   

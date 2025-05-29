@@ -1,214 +1,175 @@
-
 import React, { useState } from 'react';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import axios from 'axios';
-import { User, Trash2, Edit } from 'lucide-react';
-const API_URL = import.meta.env.VITE_API_URL;
 
-// User form schema
-const userFormSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters').optional(),
-  role: z.enum(['admin', 'driver', 'employee']),
-  phone: z.string().optional(),
-});
-
-type UserFormData = z.infer<typeof userFormSchema>;
+interface User {
+  id: string | number;
+  name: string;
+  email: string;
+  role: string;
+  phone?: string;
+}
 
 interface UserCardProps {
-  user: any;
-  onDelete: (id: string) => void;
-  onUpdate: () => void;
+  user: User;
+  onDelete: (userId: string | number) => void;
+  onUpdate: (userId: string | number, updatedData: any) => void;
 }
 
 const UserCard: React.FC<UserCardProps> = ({ user, onDelete, onUpdate }) => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
-  const token = localStorage.getItem('auth_token');
-
-  const form = useForm<UserFormData>({
-    resolver: zodResolver(userFormSchema),
-    defaultValues: {
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      phone: user.phone || '',
-    },
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    phone: user.phone || '',
+    password: '',
   });
 
-  const handleEdit = () => {
-    setIsDialogOpen(true);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleUpdate = async (data: UserFormData) => {
+  const handleRoleChange = (value: string) => {
+    setFormData({ ...formData, role: value });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await axios.put(`${API_URL}/users/${user.id}`, data, { headers });
-      toast({
-        title: 'Success',
-        description: 'User updated successfully',
+      await onUpdate(user.id, {
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        phone: formData.phone,
+        password: formData.password || undefined,
       });
-      setIsDialogOpen(false);
-      onUpdate();
-    } catch (error: any) {
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error updating user:', error);
+    }
+  };
+
+  const handleDelete = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!user.id) {
       toast({
         title: 'Error',
-        description: error.response?.data?.error || 'Failed to update user',
+        description: 'Invalid user ID',
         variant: 'destructive',
       });
+      setIsDeleteDialogOpen(false);
+      return;
     }
-  };
-
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      onDelete(user.id);
-    }
+    onDelete(user.id);
+    setIsDeleteDialogOpen(false);
   };
 
   return (
-    <>
-      <Card className="overflow-hidden">
-        <CardHeader className="bg-purple-50">
-          <CardTitle className="flex items-center gap-2">
-            <User className="text-purple-600" size={20} />
-            {user.name}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4">
-          <div className="grid gap-2">
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Email:</span>
-              <span className="text-sm">{user.email}</span>
+    <Card>
+      <CardHeader>
+        <CardTitle>{user.name}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isEditing ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              placeholder="Name"
+              required
+            />
+            <Input
+              name="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              placeholder="Email"
+              type="email"
+              required
+            />
+            <Select value={formData.role} onValueChange={handleRoleChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="driver">Driver</SelectItem>
+                <SelectItem value="employee">Employee</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              name="phone"
+              value={formData.phone}
+              onChange={handleInputChange}
+              placeholder="Phone"
+            />
+            <Input
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              placeholder="New Password (optional)"
+              type="password"
+            />
+            <div className="flex space-x-2">
+              <Button type="submit">Save</Button>
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
             </div>
-            <div className="flex justify-between">
-              <span className="text-sm font-medium">Role:</span>
-              <Badge variant={user.role === 'admin' ? 'default' : user.role === 'driver' ? 'secondary' : 'outline'}>
-                {user.role}
-              </Badge>
+          </form>
+        ) : (
+          <div className="space-y-2">
+            <p><strong>Email:</strong> {user.email}</p>
+            <p><strong>Role:</strong> {user.role}</p>
+            {user.phone && <p><strong>Phone:</strong> {user.phone}</p>}
+            <div className="flex space-x-2">
+              <Button onClick={() => setIsEditing(true)}>Edit</Button>
+              <Button variant="destructive" onClick={handleDelete}>
+                Delete
+              </Button>
             </div>
-            {user.phone && (
-              <div className="flex justify-between">
-                <span className="text-sm font-medium">Phone:</span>
-                <span className="text-sm">{user.phone}</span>
-              </div>
-            )}
           </div>
-        </CardContent>
-        <CardFooter className="border-t bg-gray-50 p-2 flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={handleEdit} className="flex items-center gap-1">
-            <Edit size={14} />
-            Edit
-          </Button>
-          <Button variant="destructive" size="sm" onClick={handleDelete} className="flex items-center gap-1">
-            <Trash2 size={14} />
-            Delete
-          </Button>
-        </CardFooter>
-      </Card>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        )}
+      </CardContent>
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogTrigger asChild>
+          <span />
+        </DialogTrigger>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
+            <DialogTitle>Confirm Delete</DialogTitle>
           </DialogHeader>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleUpdate)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password (Leave blank to keep current)</FormLabel>
-                    <FormControl>
-                      <Input type="password" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="driver">Driver</SelectItem>
-                        <SelectItem value="employee">Employee</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone (Optional)</FormLabel>
-                    <FormControl>
-                      <Input {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">Save Changes</Button>
-              </DialogFooter>
-            </form>
-          </Form>
+          <p>
+            Are you sure you want to delete the user <strong>{user.name}</strong> ({user.email})?
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>
+              Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </Card>
   );
 };
 
