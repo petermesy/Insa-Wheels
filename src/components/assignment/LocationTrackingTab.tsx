@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { 
   Card,
@@ -43,11 +42,11 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
     });
 
     newSocket.on('carLocationUpdate', (data) => {
-      console.log('Received location update:', data);
+      // data.driverId is the driver_id of the vehicle
       if (data && data.driverId) {
         setVehicleLocations(prev => ({
           ...prev,
-          [data.driverId]: {
+          [String(data.driverId)]: {
             coords: data.location,
             altitude: data.altitude,
             speed: data.speed,
@@ -62,6 +61,34 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
     };
   }, []);
 
+  // adminCarLocationUpdate
+useEffect(() => {
+  const newSocket = io(`${API_URL}`);
+  setSocket(newSocket);
+
+  newSocket.on('connect', () => {
+    // Join admin room
+    newSocket.emit('join', { role: 'admin' });
+  });
+
+  newSocket.on('adminCarLocationUpdate', (data) => {
+    if (data && data.vehicleId) {
+      setVehicleLocations(prev => ({
+        ...prev,
+        [String(data.vehicleId)]: {
+          coords: data.location,
+          altitude: data.altitude,
+          speed: data.speed,
+          timestamp: data.timestamp,
+        }
+      }));
+    }
+  });
+
+  return () => {
+    newSocket.disconnect();
+  };
+}, []);
   // Select first vehicle by default
   useEffect(() => {
     if (vehicles.length > 0 && !selectedVehicleId) {
@@ -75,8 +102,7 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
   const getDriverForVehicle = (vehicleId: number) => {
     const vehicle = vehicles.find(v => v.id === vehicleId);
     if (!vehicle || !vehicle.driver_id) return null;
-    
-    return users.find(u => u.id === vehicle.driver_id);
+    return users.find(u => String(u.id) === String(vehicle.driver_id));
   };
 
   // Get employees assigned to a vehicle
@@ -85,8 +111,7 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
     if (!vehicle || !vehicle.assigned_employees || vehicle.assigned_employees.length === 0) {
       return [];
     }
-    
-    return users.filter(u => vehicle.assigned_employees.includes(u.id));
+    return users.filter(u => vehicle.assigned_employees.map(String).includes(String(u.id)));
   };
 
   // Format speed for display
@@ -101,9 +126,35 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
     return new Date(timestamp).toLocaleTimeString();
   };
 
+  // Get latest location data for a vehicle (live or static)
+  const getLocationDataForVehicle = (vehicle: any) => {
+    // Prefer live location from socket, fallback to DB fields
+    const driverId = vehicle.driver_id;
+    const live = driverId ? vehicleLocations[String(driverId)] : null;
+
+    if (live) return live;
+
+    // Fallback to DB fields if available
+    if (
+      vehicle.location_latitude !== undefined &&
+      vehicle.location_longitude !== undefined
+    ) {
+      return {
+        coords: [
+          Number(vehicle.location_latitude) || 0,
+          Number(vehicle.location_longitude) || 0,
+        ] as [number, number],
+        altitude: vehicle.location_altitude ?? null,
+        speed: vehicle.location_speed ?? null,
+        timestamp: vehicle.location_timestamp ?? undefined,
+      };
+    }
+    return null;
+  };
+
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
   const driver = selectedVehicle ? getDriverForVehicle(selectedVehicle.id) : null;
-  const locationData = driver ? vehicleLocations[driver.id] : null;
+  const locationData = selectedVehicle ? getLocationDataForVehicle(selectedVehicle) : null;
 
   return (
     <div className="space-y-6">
@@ -123,8 +174,8 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
               ) : (
                 vehicles.map(vehicle => {
                   const driver = getDriverForVehicle(vehicle.id);
-                  const hasLocation = driver && vehicleLocations[driver.id];
-                  
+                  const hasLocation = !!getLocationDataForVehicle(vehicle);
+
                   return (
                     <div 
                       key={vehicle.id}

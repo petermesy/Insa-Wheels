@@ -65,6 +65,16 @@ if (vehicle && Array.isArray(vehicle.assigned_employees)) {
     res.status(500).json({ error: 'Server error' });
   }
 });
+// After emitting to employees:
+io.to('admin').emit('adminCarLocationUpdate', {
+  driverId,
+  vehicleId: vehicle.id,
+  location,
+  altitude,
+  accuracy,
+  speed,
+  timestamp: new Date(),
+});
 
 // Get latest location (public endpoint for demo purposes)
 router.get('/latest/:driverId', (req, res) => {
