@@ -26,26 +26,6 @@ router.post('/car-location', async (req, res) => {
       speed,
       timestamp: new Date()
     };
-
-    // // Find the vehicle for this driver
-    // const vehicleRes = await db.query(
-    //   `SELECT id, 
-    //           ARRAY(
-    //             SELECT ve.employee_id 
-    //             FROM vehicle_employees ve 
-    //             WHERE ve.vehicle_id = v.id
-    //           ) as assigned_employees 
-    //      FROM vehicles v 
-    //      WHERE driver_id = $1`,
-    //   [driverId]
-    // );
-    // const vehicle = vehicleRes.rows[0];
-
-    // if (vehicle && vehicle.assigned_employees) {
-    //   for (const employeeId of vehicle.assigned_employees) {
-    //     io.to(`employee_${employeeId}`).emit('carLocationUpdate', locationData);
-    //   }
-    // }
     const vehicleRes = await db.query(
   `SELECT id, assigned_employees FROM vehicles WHERE driver_id = $1`,
   [driverId]
@@ -57,6 +37,15 @@ if (vehicle && Array.isArray(vehicle.assigned_employees)) {
     io.to(`employee_${employeeId}`).emit('carLocationUpdate', locationData);
   }
 }
+io.to('admin').emit('adminCarLocationUpdate', {
+  driverId,
+  vehicleId: vehicle ? vehicle.id : null,
+  location,
+  altitude,
+  accuracy,
+  speed,
+  timestamp: new Date(),
+});
 
     console.log('Location update received and sent to employees:', locationData);
     res.status(200).json({ success: true });
@@ -66,15 +55,7 @@ if (vehicle && Array.isArray(vehicle.assigned_employees)) {
   }
 });
 // After emitting to employees:
-io.to('admin').emit('adminCarLocationUpdate', {
-  driverId,
-  vehicleId: vehicle.id,
-  location,
-  altitude,
-  accuracy,
-  speed,
-  timestamp: new Date(),
-});
+
 
 // Get latest location (public endpoint for demo purposes)
 router.get('/latest/:driverId', (req, res) => {

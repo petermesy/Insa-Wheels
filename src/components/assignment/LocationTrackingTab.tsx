@@ -32,25 +32,25 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
   const [vehicleLocations, setVehicleLocations] = useState<{[key: string]: Location}>({});
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
 
-  // Initialize Socket.io connection
+  // Initialize Socket.io connection and join admin room
   useEffect(() => {
     const newSocket = io(`${API_URL}`);
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      console.log('Connected to socket server');
+      // Join admin room
+      newSocket.emit('join', { role: 'admin' });
     });
 
-    newSocket.on('carLocationUpdate', (data) => {
-      // data.driverId is the driver_id of the vehicle
-      if (data && data.driverId) {
+    newSocket.on('adminCarLocationUpdate', (data) => {
+      if (data && data.vehicleId) {
         setVehicleLocations(prev => ({
           ...prev,
-          [String(data.driverId)]: {
+          [String(data.vehicleId)]: {
             coords: data.location,
             altitude: data.altitude,
             speed: data.speed,
-            timestamp: new Date().toISOString()
+            timestamp: data.timestamp,
           }
         }));
       }
@@ -61,34 +61,6 @@ const LocationTrackingTab: React.FC<LocationTrackingTabProps> = ({
     };
   }, []);
 
-  // adminCarLocationUpdate
-useEffect(() => {
-  const newSocket = io(`${API_URL}`);
-  setSocket(newSocket);
-
-  newSocket.on('connect', () => {
-    // Join admin room
-    newSocket.emit('join', { role: 'admin' });
-  });
-
-  newSocket.on('adminCarLocationUpdate', (data) => {
-    if (data && data.vehicleId) {
-      setVehicleLocations(prev => ({
-        ...prev,
-        [String(data.vehicleId)]: {
-          coords: data.location,
-          altitude: data.altitude,
-          speed: data.speed,
-          timestamp: data.timestamp,
-        }
-      }));
-    }
-  });
-
-  return () => {
-    newSocket.disconnect();
-  };
-}, []);
   // Select first vehicle by default
   useEffect(() => {
     if (vehicles.length > 0 && !selectedVehicleId) {
@@ -129,9 +101,7 @@ useEffect(() => {
   // Get latest location data for a vehicle (live or static)
   const getLocationDataForVehicle = (vehicle: any) => {
     // Prefer live location from socket, fallback to DB fields
-    const driverId = vehicle.driver_id;
-    const live = driverId ? vehicleLocations[String(driverId)] : null;
-
+    const live = vehicleLocations[String(vehicle.id)];
     if (live) return live;
 
     // Fallback to DB fields if available
