@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   MapContainer,
@@ -28,6 +28,14 @@ interface VehicleData {
   assignedEmployees: string[];
 }
 
+interface EmployeeLocation {
+  id?: string | number;
+  name?: string;
+  latitude: number;
+  longitude: number;
+  timestamp?: string;
+}
+
 interface MapComponentProps {
   vehicles?: VehicleData[];
   employeeLocation?: Location;
@@ -35,6 +43,7 @@ interface MapComponentProps {
   isDriver?: boolean;
   driverId?: string;
   driverLocation?: { latitude: number; longitude: number }; // Real-time driver location
+  employeeLocations?: EmployeeLocation[]; // NEW: array of employee locations for driver view
 }
 
 const carIcon = new L.Icon({
@@ -51,6 +60,13 @@ const userIcon = new L.Icon({
   popupAnchor: [0, -32],
 });
 
+const employeeIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/684/684908.png", // Different icon for employees
+  iconSize: [28, 28],
+  iconAnchor: [14, 28],
+  popupAnchor: [0, -28],
+});
+
 const MapComponent: React.FC<MapComponentProps> = ({
   vehicles = [],
   employeeLocation,
@@ -58,6 +74,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
   isDriver = false,
   driverId,
   driverLocation,
+  employeeLocations = [], // NEW
 }) => {
   const [route, setRoute] = useState<[number, number][]>([]);
   const [distance, setDistance] = useState<number>(0);
@@ -139,9 +156,13 @@ const MapComponent: React.FC<MapComponentProps> = ({
   // Calculate distance string
   const distanceString = distance ? `${(distance / 1000).toFixed(2)} km` : "--";
 
-  // Center map on employee or driver or default
+  // Center map on employee, driver, or first employee in employeeLocations, or default
+  const firstEmp =
+    employeeLocations && employeeLocations.length > 0
+      ? [employeeLocations[0].latitude, employeeLocations[0].longitude]
+      : undefined;
   const center =
-    employeeLatLng || driverLatLng || [9.0155, 38.7632];
+    employeeLatLng || driverLatLng || firstEmp || [9.0155, 38.7632];
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -155,11 +176,13 @@ const MapComponent: React.FC<MapComponentProps> = ({
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
           />
+          {/* Employee's own marker (for employee view) */}
           {employeeLatLng && (
             <Marker position={employeeLatLng} icon={userIcon}>
               <Popup>You (Employee)</Popup>
             </Marker>
           )}
+          {/* Driver marker */}
           {driverLatLng && (
             <Marker position={driverLatLng} icon={carIcon}>
               <Popup>
@@ -174,6 +197,24 @@ const MapComponent: React.FC<MapComponentProps> = ({
               </Popup>
             </Marker>
           )}
+          {/* Assigned employees' markers (for driver view) */}
+          {employeeLocations &&
+            employeeLocations.map((emp, idx) =>
+              emp.latitude && emp.longitude ? (
+                <Marker
+                  key={emp.id || idx}
+                  position={[emp.latitude, emp.longitude]}
+                  icon={employeeIcon}
+                >
+                  <Popup>
+                    Employee {emp.name || emp.id || idx}
+                    <br />
+                    Lat: {emp.latitude.toFixed(6)}, Lng: {emp.longitude.toFixed(6)}
+                  </Popup>
+                </Marker>
+              ) : null
+            )}
+          {/* Route (for employee view) */}
           {route.length > 0 && <Polyline positions={route} color="blue" />}
         </MapContainer>
 

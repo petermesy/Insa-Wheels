@@ -41,11 +41,11 @@ const Index = () => {
                     Sign In
                   </Button>
                 </Link>
-                <Link to="/register">
+                {/* <Link to="/register">
                   <Button size="lg" variant="outline" className="bg-white/10 text-white border-white hover:bg-white/20">
                     Register
                   </Button>
-                </Link>
+                </Link> */}
               </motion.div>
             </div>
             
@@ -58,7 +58,7 @@ const Index = () => {
               >
                 <div className="relative rounded-lg overflow-hidden shadow-2xl border-4 border-white/20">
                   <img 
-                    src="/lovable-uploads/7005b12f-21eb-4f24-8a3c-e6abefc0551a.png" 
+                    src="/src/asset/Logo_of_Ethiopian_INSA.png" 
                     alt="INSA Wheels Tracker Logo" 
                     className="w-full h-auto p-8 bg-white"
                   />

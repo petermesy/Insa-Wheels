@@ -53,6 +53,40 @@ router.post('/car-location', async (req, res) => {
   }
 });
 
+// Location update endpoint for employees (to show on driver's map)
+router.post('/employee-location', async (req, res) => {
+  try {
+    const { id, latitude, longitude } = req.body;
+    const io = req.app.get('io');
+
+    // Update employee location in DB (optional, if you want to persist)
+    await db.query(
+      `UPDATE users SET location_latitude = $1, location_longitude = $2, location_timestamp = NOW() WHERE id = $3`,
+      [latitude, longitude, id]
+    );
+
+    // Find the vehicle this employee is assigned to
+    const vehicleRes = await db.query(
+      `SELECT driver_id FROM vehicles WHERE assigned_employees @> ARRAY[$1]::integer[] LIMIT 1`,
+      [id]
+    );
+    const vehicle = vehicleRes.rows[0];
+    if (vehicle && vehicle.driver_id) {
+      io.to(`driver_${vehicle.driver_id}`).emit('employeeLocationUpdate', {
+        employeeId: id,
+        latitude,
+        longitude,
+        timestamp: new Date(),
+      });
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error updating employee location:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Example: join room endpoint (optional, for admin to join 'admin' room)
 router.post('/join-room', (req, res) => {
   const { socketId, role } = req.body;

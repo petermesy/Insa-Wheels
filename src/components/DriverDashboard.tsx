@@ -30,11 +30,12 @@ const DriverDashboard: React.FC = () => {
   const [assignedEmployees, setAssignedEmployees] = useState<any[]>([]);
   const [address, setAddress] = useState("Loading...");
   const [altitude, setAltitude] = useState<number | null>(null);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [employeeLocations, setEmployeeLocations] = useState<{ [id: string]: { latitude: number, longitude: number, timestamp: string } }>({});
 
   // Fetch user info from localStorage
   useEffect(() => {
     const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-    console.log('User Info:', userInfo); // Debug: Log user info
     setUsername(userInfo.email || "");
     setUserRole(userInfo.role || "");
   }, []);
@@ -70,9 +71,7 @@ const DriverDashboard: React.FC = () => {
 
   // Fetch assigned employees
   const fetchAssignedEmployees = async (employeeIds: number[]) => {
-    console.log('Fetching employees with IDs:', employeeIds); // Debug: Log employee IDs
     if (!employeeIds || employeeIds.length === 0) {
-      console.log('No employee IDs provided');
       setAssignedEmployees([]);
       return;
     }
@@ -80,11 +79,9 @@ const DriverDashboard: React.FC = () => {
       const res = await axios.get(`${API_URL}/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Users fetched:', res.data); // Debug: Log all users
       const employees = res.data.filter((u: any) =>
         employeeIds.map(Number).includes(Number(u.id))
       );
-      console.log('Filtered employees:', employees); // Debug: Log filtered employees
       setAssignedEmployees(employees);
       if (employees.length === 0) {
         toast({
@@ -94,7 +91,6 @@ const DriverDashboard: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error("Error fetching employees:", error);
       setAssignedEmployees([]);
       toast({
         title: "Error",
@@ -104,25 +100,45 @@ const DriverDashboard: React.FC = () => {
     }
   };
 
+  // Listen for employee location updates via socket
+  useEffect(() => {
+    if (!isLoggedIn || userRole !== "driver") return;
+    const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
+    const socketUrl = API_URL.replace("/api", "");
+    const newSocket = io(socketUrl, {
+      transports: ["websocket"],
+      upgrade: false,
+    });
+    newSocket.emit("joinRoom", `driver_${userInfo.id}`);
+    setSocket(newSocket);
+
+    newSocket.on("employeeLocationUpdate", (data) => {
+      setEmployeeLocations((prev) => ({
+        ...prev,
+        [data.employeeId]: { latitude: data.latitude, longitude: data.longitude, timestamp: data.timestamp }
+      }));
+    });
+
+    return () => {
+      newSocket.emit("leaveRoom", `driver_${userInfo.id}`);
+      newSocket.disconnect();
+    };
+  }, [isLoggedIn, userRole]);
+
   // Fetch assigned vehicle info and employees
   const fetchVehicleData = async () => {
     setIsLoadingVehicle(true);
     try {
       const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-      console.log('Fetching vehicle for user ID:', userInfo.id); // Debug: Log user ID
       const vehiclesRes = await axios.get(`${API_URL}/vehicles`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      console.log('Vehicles fetched:', vehiclesRes.data); // Debug: Log all vehicles
       const vehicle = vehiclesRes.data.find((v: any) => v.driver_id === Number(userInfo.id));
-      console.log('Assigned vehicle:', vehicle); // Debug: Log found vehicle
       setVehicleData(vehicle || null);
 
       if (vehicle && vehicle.assigned_employees) {
-        console.log('Assigned employee IDs:', vehicle.assigned_employees); // Debug: Log employee IDs
         await fetchAssignedEmployees(vehicle.assigned_employees);
       } else {
-        console.log('No vehicle or no assigned employees');
         setAssignedEmployees([]);
         if (!vehicle) {
           toast({
@@ -133,7 +149,6 @@ const DriverDashboard: React.FC = () => {
         }
       }
     } catch (error) {
-      console.error("Error fetching vehicle data:", error);
       setVehicleData(null);
       setAssignedEmployees([]);
       toast({
@@ -327,6 +342,7 @@ const DriverDashboard: React.FC = () => {
               <MapComponent
                 vehicles={enhancedVehicle ? [enhancedVehicle] : []}
                 driverLocation={location}
+                employeeLocations={Object.values(employeeLocations)}
               />
             )}
           </div>

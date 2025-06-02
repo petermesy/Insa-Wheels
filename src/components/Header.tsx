@@ -14,7 +14,7 @@ const Header: React.FC<HeaderProps> = ({ userType, onLogout }) => {
       <div className="container mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <img 
-            src="/lovable-uploads/7005b12f-21eb-4f24-8a3c-e6abefc0551a.png" 
+            src="/src/asset/Logo_of_Ethiopian_INSA.png" 
             alt="INSA Wheels Tracker" 
             className="h-10 w-10"
           />
