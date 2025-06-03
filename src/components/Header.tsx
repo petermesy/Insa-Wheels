@@ -48,11 +48,9 @@ const Header: React.FC<HeaderProps> = ({ userType, onLogout }) => {
             </>
           ) : (
             <>
+            
               <Link to="/login">
-                <Button variant="ghost" size="sm">Login</Button>
-              </Link>
-              <Link to="/register">
-                <Button variant="secondary" size="sm">Register</Button>
+                <Button variant="secondary" size="sm">Login</Button>
               </Link>
             </>
           )}
