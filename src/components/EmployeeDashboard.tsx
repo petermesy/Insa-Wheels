@@ -106,14 +106,23 @@ const EmployeeDashboard: React.FC = () => {
     updateEmployeeLocation(latitude, longitude);
   };
 
+  // --- UPDATED: Send to both endpoints ---
   const updateEmployeeLocation = async (
     latitude: number,
     longitude: number
   ) => {
     try {
+      // Update in users table (for persistence)
       await axios.put(
         `${API_URL}/users/${userInfo.id}/location`,
         { latitude, longitude },
+        { headers }
+      );
+
+      // Send to driver's socket via backend
+      await axios.post(
+        `${API_URL}/locations/employee-location`,
+        { id: userInfo.id, latitude, longitude },
         { headers }
       );
 
@@ -121,14 +130,14 @@ const EmployeeDashboard: React.FC = () => {
         title: "Location Updated",
         description: "Your current location has been updated.",
       });
-    } catch (error) {
-      console.error("Error updating location:", error);
-      toast({
-        title: "Update Error",
-        description: "Failed to update your location.",
-        variant: "destructive",
-      });
-    } finally {
+    } catch (error: any) {
+  console.error("Error updating location:", error, error?.response?.data);
+  toast({
+    title: "Update Error",
+    description: error?.response?.data?.error || error?.message || "Failed to update your location.",
+    variant: "destructive",
+  });
+} finally {
       setIsLocating(false);
     }
   };
